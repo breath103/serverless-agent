@@ -2,6 +2,7 @@
 type IsNever<T> = [T] extends [never] ? true : false;
 
 // Routes shape from backend's ExtractRoutes
+/* eslint-disable @typescript-eslint/no-restricted-types */
 type Routes = {
   [path: string]: {
     [method: string]: {
@@ -12,8 +13,10 @@ type Routes = {
     };
   };
 };
+/* eslint-enable @typescript-eslint/no-restricted-types */
 
 // Build options type based on what the route needs
+/* eslint-disable @typescript-eslint/no-restricted-types */
 type FetchOptions<T> = (IsNever<T extends { params: infer P } ? P : never> extends true
   ? unknown
   : { params: T extends { params: infer P } ? P : never }) &
@@ -23,6 +26,7 @@ type FetchOptions<T> = (IsNever<T extends { params: infer P } ? P : never> exten
     (IsNever<T extends { body: infer B } ? B : never> extends true
       ? unknown
       : { body: T extends { body: infer B } ? B : never });
+/* eslint-enable @typescript-eslint/no-restricted-types */
 
 // Check if options are required
 type HasRequired<T> = IsNever<T extends { params: infer P } ? P : never> extends true
@@ -35,6 +39,8 @@ type HasRequired<T> = IsNever<T extends { params: infer P } ? P : never> extends
 
 // API client class
 export class ApiClient<T extends Routes> {
+  constructor(private baseUrl = "", private defaultHeaders: Record<string, string> = {}) {}
+
   async fetch<P extends keyof T & string, M extends keyof T[P] & string>(
     ...args: HasRequired<T[P][M]> extends true
       ? [path: P, method: M, options: FetchOptions<T[P][M]>]
@@ -42,7 +48,9 @@ export class ApiClient<T extends Routes> {
   ): Promise<T[P][M] extends { response: infer R } ? R : never> {
     const [path, method, options] = args as [string, string, {
       params?: Record<string, string | number>;
+      // eslint-disable-next-line @typescript-eslint/no-restricted-types
       query?: Record<string, unknown>;
+      // eslint-disable-next-line @typescript-eslint/no-restricted-types
       body?: Record<string, unknown>;
     }?];
 
@@ -69,9 +77,9 @@ export class ApiClient<T extends Routes> {
       if (qs) url += `?${qs}`;
     }
 
-    const response = await fetch(url, {
+    const response = await fetch(`${this.baseUrl}${url}`, {
       method,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...this.defaultHeaders },
       body: options?.body ? JSON.stringify(options.body) : undefined,
     });
 

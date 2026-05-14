@@ -1,1 +1,490 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/jetbrains-mono";
+
+@source "../../node_modules/@blocknote/shadcn/dist";
+
+/* =============================================================================
+   TERMINAL-HUD DESIGN SYSTEM
+   See documents/design-system/2026-04-26_terminal-hud-design-system.md
+
+   Black canvas, monospace, amber primary, mint operational, red failure.
+   Dark-only. No rounded corners. Phosphor bloom + scanlines + vignette
+   applied globally — no opt-in attribute, no per-page overrides.
+   ============================================================================= */
+
+:root {
+  /* ── Palette seeds ── */
+  --bg:           #000000;
+  --bg-elev:      #0a0a0a;
+
+  --amber:        #ffb200;
+  --amber-dim:    #f0a820;   /* readable secondary on black — close to primary, used for captions/timestamps */
+  --amber-hair:   #5a3a00;   /* borders/dividers only */
+
+  --mint:         #9decdb;
+  --mint-dim:     #7ec4b3;
+
+  --red:          #ff3344;
+  --red-dim:      #a8202c;
+
+  /* ── Semantic roles (names preserved from prior system for callsite compat) ── */
+  --background:        var(--bg);
+  --surface:           var(--bg);
+  --surface-secondary: var(--bg-elev);
+
+  --text-1: var(--amber);
+  --text-2: var(--amber-dim);
+  --text-3: var(--amber-hair);
+
+  --border: var(--amber);
+  --muted:  color-mix(in oklch, var(--amber) 8%, transparent);
+
+  --error:   var(--red);
+  --success: var(--mint);
+
+  /* Accents collapse onto the three semantic hues. Legacy callsites keep working. */
+  --accent-1:    var(--amber);
+  --accent-1-fg: var(--bg);
+  --accent-2:    var(--mint);
+  --accent-2-fg: var(--bg);
+  --accent-3:    var(--red);
+  --accent-3-fg: var(--bg);
+
+  --radius: 0;
+
+  /* Phosphor bloom — composes into text-shadow / box-shadow via currentColor.
+     Compose with var(--bloom-text) for text and var(--bloom-edge-shadow) for
+     borders, both inherit from currentColor automatically. */
+  --bloom-near: 0 0 0.5px currentColor;
+  --bloom-mid:  0 0 2px   color-mix(in oklch, currentColor 55%, transparent);
+  --bloom-far:  0 0 8px   color-mix(in oklch, currentColor 22%, transparent);
+  --bloom-text: var(--bloom-near), var(--bloom-mid), var(--bloom-far);
+  --bloom-edge-shadow: 0 0 0.5px currentColor,
+                       0 0 6px color-mix(in oklch, currentColor 22%, transparent);
+
+  /* CRT effect knobs — change these to tune scanline / vignette intensity. */
+  --scanline-opacity: 0.1;   /* 0 disables; 0.10 subtle, 0.18 visible, 0.30 heavy */
+  --vignette-intensity: 0.2; /* 0 disables; 0.8 is heavy */
+
+  /* Channel colors — collapsed to amber. Routes that surface "operational"
+     state per-channel can override per-element to mint/red as needed. */
+  --ch-phone:  var(--amber);
+  --ch-slack:  var(--amber);
+  --ch-gmail:  var(--amber);
+  --ch-notion: var(--amber);
+  --ch-zoom:   var(--amber);
+  --ch-linear: var(--amber);
+}
+
+/* sugar-high syntax highlighting — retuned to terminal palette. */
+:root {
+  --sh-class:      var(--mint);
+  --sh-identifier: var(--text-1);
+  --sh-sign:       var(--text-2);
+  --sh-property:   var(--mint);
+  --sh-entity:     var(--mint-dim);
+  --sh-jsxliterals: var(--amber);
+  --sh-string:     var(--mint);
+  --sh-keyword:    var(--amber);
+  --sh-comment:    var(--amber-hair);
+}
+
+@theme {
+  /* Animations — registered via --animate-* so Tailwind v4 generates
+     animate-hud-blink / animate-hud-tick utilities (an `@utility` block with
+     `animation:` doesn't bind keyframes correctly in v4). */
+  --animate-hud-blink: hud-blink 1s steps(1, end) infinite;
+  --animate-hud-tick:  hud-tick  1s steps(8, end) infinite;
+}
+
+@theme inline {
+  --color-*: initial;
+
+  /* Mono is the body face. Keep --font-sans wired to mono so Tailwind's default
+     font-sans utility inherits the new system without touching every callsite. */
+  --font-sans: "JetBrains Mono Variable", "JetBrains Mono", "Berkeley Mono",
+               "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", "Berkeley Mono",
+               "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Primitives */
+  --color-white: #fff;
+  --color-black: #000;
+
+  /* Palette tokens, exposed as Tailwind utilities (text-amber, bg-mint, etc.) */
+  --color-amber:     var(--amber);
+  --color-amber-dim: var(--amber-dim);
+  --color-amber-hair: var(--amber-hair);
+  --color-mint:      var(--mint);
+  --color-mint-dim:  var(--mint-dim);
+  --color-red:       var(--red);
+  --color-red-dim:   var(--red-dim);
+
+  /* Design tokens */
+  --color-background:        var(--background);
+  --color-surface:           var(--surface);
+  --color-surface-secondary: var(--surface-secondary);
+  --color-foreground:        var(--text-1);
+  --color-text-1:            var(--text-1);
+  --color-text-2:            var(--text-2);
+  --color-text-3:            var(--text-3);
+  --color-accent-1:          var(--accent-1);
+  --color-accent-2:          var(--accent-2);
+  --color-accent-3:          var(--accent-3);
+  --color-border:            var(--border);
+  --default-border-color:    var(--border);
+  --color-muted:             var(--muted);
+  --color-muted-foreground:  var(--text-2);
+  --color-error:             var(--error);
+  --color-success:           var(--success);
+
+  /* Channel colors */
+  --color-ch-phone:  var(--ch-phone);
+  --color-ch-slack:  var(--ch-slack);
+  --color-ch-gmail:  var(--ch-gmail);
+  --color-ch-notion: var(--ch-notion);
+  --color-ch-zoom:   var(--ch-zoom);
+  --color-ch-linear: var(--ch-linear);
+
+  /* shadcn compat */
+  --color-popover:             var(--surface);
+  --color-popover-foreground:  var(--text-1);
+  --color-accent:              var(--muted);
+  --color-accent-foreground:   var(--text-1);
+  --color-primary:             var(--accent-1);
+  --color-primary-foreground:  var(--bg);
+  --color-secondary:           var(--accent-2);
+  --color-secondary-foreground: var(--bg);
+  --color-destructive:         var(--error);
+  --color-card:                var(--surface);
+  --color-card-foreground:     var(--text-1);
+
+  /* All radii collapse to 0 — sharp geometry is non-negotiable. */
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+}
+
+/* =============================================================================
+   BlockNote (markdown editor) compat — kept from prior system, retuned colors.
+   ============================================================================= */
+.bn-container[data-color-scheme] {
+  --bn-colors-editor-background: transparent;
+  --bn-colors-menu-background: var(--background);
+  --bn-colors-menu-text: var(--text-1);
+  --bn-colors-tooltip-background: var(--background);
+  --bn-colors-tooltip-text: var(--text-1);
+  --bn-colors-hovered-background: var(--muted);
+  --bn-colors-hovered-text: var(--text-1);
+  --bn-colors-selected-background: var(--muted);
+  --bn-colors-selected-text: var(--text-1);
+  --bn-colors-border: var(--border);
+}
+.bn-container .bg-popover {
+  background-color: var(--background);
+}
+.memory-content-editor .bn-editor {
+  margin-left: -54px;
+}
+.bn-suggestion-menu-item[aria-selected="true"] {
+  background-color: var(--muted);
+  color: var(--text-1);
+}
+
+/* =============================================================================
+   Base layer — global typography, bloom, scanlines, vignette.
+   These are PASSIVE: applied to body/* once, no per-component knobs.
+   ============================================================================= */
+@layer base {
+  html, body {
+    @apply font-sans bg-background text-text-1;
+    font-feature-settings: "ss01", "zero", "calt";
+    /* Force perfectly black background outside the React tree too. */
+    background: var(--bg);
+  }
+
+  /* Phosphor halo on every glyph. Free at runtime. The single biggest contributor
+     to the "behind glass" feel — without it, type looks like ink on black. */
+  body, body * {
+    text-shadow: var(--bloom-text);
+  }
+
+  /* Sharp geometry, enforced. */
+  *, *::before, *::after {
+    border-color: var(--border);
+    border-radius: 0 !important;
+  }
+
+  a, button { @apply cursor-pointer; }
+
+  ::selection {
+    background: color-mix(in oklch, var(--amber) 35%, transparent);
+    color: var(--bg);
+    text-shadow: none;
+  }
+  ::placeholder { color: var(--text-2); opacity: 1; }
+
+  input, textarea, select, button { font: inherit; color: inherit; }
+}
+
+/* CRT effects (scanlines + edge vignette) live in
+   components/ui/crt-screen.module.css and are applied via <CrtScreen> at the
+   app root. Tuning knobs (--scanline-opacity, --vignette-intensity) stay on
+   :root above so they can be tweaked in one place. */
+
+@layer utilities {
+  .container { @apply max-w-5xl; }
+}
+
+/* =============================================================================
+   Aesthetic primitives. Compose these instead of hand-rolling per-element
+   borders/text-shadows. Naming: hud-* for new system, color-accent-* and
+   selectable-button-accent-* preserved as compat for routes not yet migrated.
+   ============================================================================= */
+
+/* Phosphor edge halo — apply on bordered elements to give them a visible glow
+   in the same color as their border. Pairs with `border` utility. */
+@utility bloom-edge {
+  box-shadow: var(--bloom-edge-shadow);
+}
+
+/* Type roles — match §3 of the design system spec. */
+@utility hud-eyebrow {
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--amber);          /* full bright — hierarchy is size, not dimming */
+  font-weight: 600;
+}
+@utility hud-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--amber);          /* full bright */
+  font-weight: 600;
+}
+@utility hud-caption {
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  color: var(--amber-dim);      /* genuinely tertiary: timestamps, "x chars", axis labels */
+}
+@utility hud-title {
+  font-size: 1.875rem;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--text-1);
+}
+@utility hud-display {
+  font-size: 2.75rem;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--text-1);
+}
+@utility hud-mono-data {
+  /* For lowercase data values: hostnames, timestamps, latency. */
+  font-size: 0.875rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-1);
+}
+
+/* Containers — solid (data) vs dashed (action / outside data plane).
+   No `background` here so callsites can pair with `bg-background` (modals)
+   or rely on the parent background (panels embedded in a black page). */
+@utility hud-panel {
+  border: 1px solid var(--amber);
+  padding: 1.25rem;
+  color: var(--text-1);
+  box-shadow: var(--bloom-edge-shadow);
+}
+@utility hud-panel-op {
+  border-color: var(--mint);
+  color: var(--mint);
+  box-shadow:
+    0 0 0.5px var(--mint),
+    0 0 8px color-mix(in oklch, var(--mint) 24%, transparent);
+}
+@utility hud-panel-down {
+  border-color: var(--red);
+  color: var(--red);
+  box-shadow:
+    0 0 0.5px var(--red),
+    0 0 8px color-mix(in oklch, var(--red) 28%, transparent);
+}
+@utility hud-panel-action {
+  border-style: dashed;
+}
+
+/* Hairline rule — the amber underline below page titles. */
+@utility hud-rule {
+  height: 1px;
+  background: var(--amber);
+  box-shadow: var(--bloom-edge-shadow);
+}
+
+/* Subordinate column subheader — sits below the page-level PageHeader, hairline
+   amber rule top + bottom, sticky on scroll, hosts labels like "RECORDS [N]" /
+   "SESSIONS [N]". Pair with `px-5` or `px-8` and any extra flex modifiers. */
+@utility hud-subheader {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  border-block: 1px solid var(--amber-hair);
+  background: var(--bg);
+  padding-block: 0.5rem;
+}
+
+/* Status pulse — only FAILURE blinks. Stepped, 1Hz.
+   Use as `animate-hud-blink` (registered in @theme above). */
+@keyframes hud-blink {
+  0%, 49%   { opacity: 1; }
+  50%, 100% { opacity: 0.3; }
+}
+
+/* Stepped tick for loading indicators (replaces smooth spinners per spec).
+   Use as `animate-hud-tick`. */
+@keyframes hud-tick {
+  to { transform: rotate(360deg); }
+}
+
+/* =============================================================================
+   Legacy compat utilities — kept verbatim by name, retuned to terminal palette.
+   These are still used by /app/* routes that haven't been migrated yet. They
+   will be replaced with hud-* primitives as each route is touched.
+   ============================================================================= */
+
+@utility color-accent-1 {
+  --base-color: var(--accent-1);
+  --base-foreground: var(--accent-1-fg);
+}
+@utility color-accent-2 {
+  --base-color: var(--accent-2);
+  --base-foreground: var(--accent-2-fg);
+}
+@utility color-accent-3 {
+  --base-color: var(--accent-3);
+  --base-foreground: var(--accent-3-fg);
+}
+
+/* Selected state inverts: solid accent fill, black text. Maximum contrast —
+   the row reads instantly as "this is the active one." Hover uses an 18%
+   accent-1 wash directly (not via muted), so casual hover is also visible.
+
+   On selected rows: text-shadow MUST be killed on the row AND its descendants.
+   The global per-glyph bloom uses currentColor. On selected, currentColor
+   flips to black, so the bloom would paint black halos onto the amber fill —
+   smudging the type and making it look "blurry". Same trick as the filled
+   primary Button. */
+@utility selectable-button-accent-1 {
+  background-color: transparent;
+  transition: background-color 120ms linear, color 120ms linear;
+
+  &:hover  { background-color: color-mix(in oklch, var(--accent-1) 18%, transparent); }
+  &:active { background-color: color-mix(in oklch, var(--accent-1) 28%, transparent); }
+
+  &[aria-current="page"],
+  &[data-selected="true"] {
+    background-color: var(--accent-1);
+    color: var(--bg);
+  }
+  &[aria-current="page"], &[aria-current="page"] *,
+  &[data-selected="true"], &[data-selected="true"] * {
+    text-shadow: none;
+  }
+  &[aria-current="page"]:hover,
+  &[data-selected="true"]:hover {
+    /* Darken on hover, not lighten — pressed feel, stays readable */
+    background-color: color-mix(in oklch, var(--accent-1) 86%, var(--bg));
+  }
+  &[aria-current="page"]:active,
+  &[data-selected="true"]:active {
+    background-color: color-mix(in oklch, var(--accent-1) 75%, var(--bg));
+  }
+}
+@utility selectable-button-accent-2 {
+  background-color: transparent;
+  transition: background-color 120ms linear, color 120ms linear;
+
+  &:hover  { background-color: color-mix(in oklch, var(--accent-2) 18%, transparent); }
+  &:active { background-color: color-mix(in oklch, var(--accent-2) 28%, transparent); }
+
+  &[aria-current="page"],
+  &[data-selected="true"] {
+    background-color: var(--accent-2);
+    color: var(--bg);
+  }
+  &[aria-current="page"], &[aria-current="page"] *,
+  &[data-selected="true"], &[data-selected="true"] * {
+    text-shadow: none;
+  }
+  &[aria-current="page"]:hover,
+  &[data-selected="true"]:hover {
+    background-color: color-mix(in oklch, var(--accent-2) 86%, var(--bg));
+  }
+  &[aria-current="page"]:active,
+  &[data-selected="true"]:active {
+    background-color: color-mix(in oklch, var(--accent-2) 75%, var(--bg));
+  }
+}
+@utility selectable-button-accent-3 {
+  background-color: transparent;
+  transition: background-color 120ms linear, color 120ms linear;
+
+  &:hover  { background-color: color-mix(in oklch, var(--accent-3) 18%, transparent); }
+  &:active { background-color: color-mix(in oklch, var(--accent-3) 28%, transparent); }
+
+  &[aria-current="page"],
+  &[data-selected="true"] {
+    background-color: var(--accent-3);
+    color: var(--bg);
+  }
+  &[aria-current="page"], &[aria-current="page"] *,
+  &[data-selected="true"], &[data-selected="true"] * {
+    text-shadow: none;
+  }
+  &[aria-current="page"]:hover,
+  &[data-selected="true"]:hover {
+    background-color: color-mix(in oklch, var(--accent-3) 86%, var(--bg));
+  }
+  &[aria-current="page"]:active,
+  &[data-selected="true"]:active {
+    background-color: color-mix(in oklch, var(--accent-3) 75%, var(--bg));
+  }
+}
+
+@utility icon-ghost-button {
+  @apply selectable-button-accent-1 inline-flex items-center justify-center text-text-2;
+  &:hover { color: var(--text-1); }
+}
+
+@utility ghost-button-error {
+  background-color: transparent;
+  color: var(--error);
+  transition: background-color 150ms ease, color 150ms ease;
+
+  &:hover  { background-color: color-mix(in oklch, var(--error) 12%, transparent); }
+  &:active { background-color: color-mix(in oklch, var(--error) 18%, transparent); }
+}
+
+/* Tag palette — kept by name. With a 3-color terminal palette, hue-rotation
+   from amber lands on weird off-spec colors. Collapsed to alternate between
+   amber / mint / red so legacy MultiSelect / tag UIs stay readable; routes
+   should migrate to explicit color choices. */
+@utility color-tag-0 { --base-color: var(--amber); }
+@utility color-tag-1 { --base-color: var(--mint); }
+@utility color-tag-2 { --base-color: var(--red); }
+@utility color-tag-3 { --base-color: var(--amber-dim); }
+@utility color-tag-4 { --base-color: var(--mint-dim); }
+@utility color-tag-5 { --base-color: var(--red-dim); }
+@utility color-tag-6 { --base-color: var(--amber); }
+@utility color-tag-7 { --base-color: var(--mint); }

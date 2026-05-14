@@ -1,0 +1,41 @@
+/// <reference types="aws-lambda" />
+
+import { streamHandle } from "hono/aws-lambda";
+
+import { posthog } from "../lib/posthog.js";
+import { telemetry } from "../lib/telemetry.js";
+import { app } from "./hono.js";
+
+// Use Hono's streamHandle which properly handles Set-Cookie headers
+// by extracting them into the cookies array format required by Lambda streaming
+type StreamHandler = ReturnType<typeof streamHandle>;
+const _handler: StreamHandler = streamHandle(app);
+
+// Object.assign copies the streaming marker symbol from _handler
+// so Lambda still recognizes this as a streaming handler.
+export const handler: StreamHandler = Object.assign(
+  async (...args: Parameters<StreamHandler>) => {
+    // Cron warmer: return early without processing
+    // eslint-disable-next-line @typescript-eslint/no-restricted-types
+    const event: unknown = args[0];
+    if (typeof event === "object" && event !== null && "source" in event && event.source === "warmer") {
+      console.log("[warmer] ping");
+      // In streaming Lambda, args are (event, responseStream, context).
+      // The responseStream must be closed or the invocation hangs until timeout.
+      // eslint-disable-next-line @typescript-eslint/no-restricted-types -- type assertion through unknown needed for AWS Lambda streaming args
+      const responseStream = args[1] as unknown as import("stream").Writable;
+      responseStream.end();
+      return;
+    }
+
+    await _handler(...args);
+
+    // This runs after the lambda response stream is closed.
+    // shutdown() waits for pending capture() promises before flushing.
+    await Promise.all([
+      posthog?.shutdown(),
+      telemetry?.flush(),
+    ]);
+  },
+  _handler,
+) as StreamHandler;

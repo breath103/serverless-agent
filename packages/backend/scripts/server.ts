@@ -7,15 +7,31 @@ import { loadAndValidateEnv } from "shared/env-parser";
 
 import { serve } from "@hono/node-server";
 
-// Validate env vars (already loaded by with-env.sh)
-loadAndValidateEnv(path.join(import.meta.dirname, "../src/env.d.ts"));
+import { localDdbEndpoint } from "./lib/ddb_local.js";
 
-const { project, backend, dev } = loadConfig();
+async function main(): Promise<void> {
+  const config = loadConfig();
 
-// Namespace auth cookies per project+worktree so multiple localhost dev instances don't clobber each other.
-process.env.BETTER_AUTH_COOKIE_PREFIX = `${project}-${dev.worktree}`;
+  //
+  // Validate env vars (already loaded by with-env.sh)
+  //
+  loadAndValidateEnv(path.join(import.meta.dirname, "../src/env.d.ts"), {
+    override: {
+      // Per-worktree DDB Local container — derived from ${project}-${dev.worktree}
+      // so multiple worktrees don't share state.
+      DDB_LOCAL_ENDPOINT: localDdbEndpoint(config),
+    },
+  });
 
-const { app } = await import("../src/index.js");
+  //
+  // Local dev api server
+  //
+  const { app } = await import("../src/lambda-api/hono.js");
+  serve({ fetch: app.fetch, port: config.backend.devPort });
+  console.log(`Backend running on http://localhost:${config.backend.devPort}`);
+}
 
-serve({ fetch: app.fetch, port: backend.devPort });
-console.log(`Backend running on http://localhost:${backend.devPort}`);
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

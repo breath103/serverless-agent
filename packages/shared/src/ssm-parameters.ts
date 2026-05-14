@@ -1,3 +1,3 @@
-export function backendUrlName({ project, sanitizedBranchName }: { project: string, sanitizedBranchName: string }) {
-  return `/${project}/backend/${sanitizedBranchName}`;
+export function backendUrlName({ project }: { project: string }) {
+  return `/${project}/backend/url`;
 }

@@ -5,6 +5,7 @@ import path from "path";
 export interface EnvVar {
   name: string;
   required: boolean;
+  cdkInjected: boolean;
 }
 
 export function parseEnvDts(envDtsPath: string): EnvVar[] {
@@ -31,8 +32,11 @@ export function parseEnvDts(envDtsPath: string): EnvVar[] {
     .map((m) => {
       const name = m.name.text;
       const type = m.type?.getText(source);
-      if (type === "string") return { name, required: true };
-      if (type === "string | undefined") return { name, required: false };
+      const lineEnd = content.indexOf("\n", m.getEnd());
+      const trailing = lineEnd >= 0 ? content.slice(m.getEnd(), lineEnd) : "";
+      const cdkInjected = trailing.includes("@cdk-injected");
+      if (type === "string") return { name, required: true, cdkInjected };
+      if (type === "string | undefined") return { name, required: false, cdkInjected };
       throw new Error(`${name}: must be "string" or "string | undefined", got "${type}"`);
     });
 }
@@ -56,8 +60,19 @@ export function validateEnv(
   return { missing, provided };
 }
 
-export function loadAndValidateEnv(envDtsPath: string): Record<string, string> {
-  const vars = parseEnvDts(envDtsPath);
+export function loadAndValidateEnv(envDtsPath: string, opts?: { skipCdkInjected?: boolean; override?: Record<string, string> }): Record<string, string> {
+  let vars = parseEnvDts(envDtsPath);
+
+  if (opts?.skipCdkInjected) {
+    vars = vars.filter((v) => !v.cdkInjected);
+  }
+
+  if (opts?.override) {
+    for (const [key, value] of Object.entries(opts.override)) {
+      process.env[key] = value;
+    }
+  }
+
   const { missing, provided } = validateEnv(vars);
 
   if (missing.length > 0) {

@@ -30,10 +30,14 @@ export function registerToHono<E extends Env>(
         parsedQuery = result.data;
       }
 
-      let parsedBody = {};
+      // eslint-disable-next-line @typescript-eslint/no-restricted-types
+      let parsedBody: unknown = {};
       if (bodySchema) {
+        // eslint-disable-next-line @typescript-eslint/no-restricted-types
         const rawBody: unknown = await c.req.json().catch(() => ({}));
-        const schema = z.object(bodySchema as SchemaShape);
+        const schema = bodySchema instanceof z.ZodType
+          ? bodySchema
+          : z.object(bodySchema as SchemaShape);
         const result = schema.safeParse(rawBody);
         if (!result.success) {
           throw new HTTPException(400, { message: "Invalid request body" });
@@ -41,10 +45,12 @@ export function registerToHono<E extends Env>(
         parsedBody = result.data;
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-restricted-types
       const response: unknown = await handler({
         params,
         query: parsedQuery,
         body: parsedBody,
+        // eslint-disable-next-line @typescript-eslint/no-restricted-types
         c: c as unknown as Context<E>,
       });
 

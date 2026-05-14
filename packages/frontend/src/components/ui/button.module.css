@@ -1,0 +1,86 @@
+/* Terminal-HUD button.
+   Two tiers:
+   - Filled (primary): high-contrast solid block, black text on a mint or amber
+     fill. The "GO" affordance — used for the dominant CTA on a page.
+   - Bordered (default / secondary / destructive): transparent fill, currentColor
+     border, phosphor edge halo. The inline tier.
+   No dashed borders — they read as "draft" / "placeholder" rather than
+   "actionable" and the user disliked them.
+*/
+
+.button {
+  --btn-color: var(--amber);
+  color: var(--btn-color);
+  background: transparent;
+  border: 1px solid var(--btn-color);
+  border-radius: 0;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  box-shadow:
+    0 0 0.5px var(--btn-color),
+    0 0 6px color-mix(in oklch, var(--btn-color) 22%, transparent);
+  transition:
+    background-color 0.15s linear,
+    color 0.15s linear,
+    box-shadow 0.15s linear;
+}
+
+.button:hover:not(:disabled) {
+  background-color: color-mix(in oklch, var(--btn-color) 12%, transparent);
+  box-shadow:
+    0 0 0.5px var(--btn-color),
+    0 0 10px color-mix(in oklch, var(--btn-color) 38%, transparent);
+}
+
+.button:active:not(:disabled) {
+  background-color: color-mix(in oklch, var(--btn-color) 22%, transparent);
+}
+
+.button:focus-visible {
+  outline: 1px solid var(--btn-color);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  box-shadow: 0 0 0.5px var(--btn-color);
+}
+
+/* ── Bordered variants (inline tier) ── */
+.button[data-variant="default"]     { --btn-color: var(--amber); }
+.button[data-variant="secondary"]   { --btn-color: var(--mint); }
+.button[data-variant="destructive"] { --btn-color: var(--red); }
+
+/* ── Filled variant (primary CTA) ──
+   Solid mint block, black text. Highest visual punch on the page.
+   Bloom is in mint (the fill color) so the halo reads as light bleeding
+   off the button. Black text gets text-shadow:none — black phosphor
+   doesn't glow and the global halo would muddy the type.
+*/
+.button[data-variant="primary"] {
+  --btn-color: var(--mint);
+  background-color: var(--mint);
+  color: var(--bg);
+  border-color: var(--mint);
+  font-weight: 700;
+  box-shadow:
+    0 0 0.5px var(--mint),
+    0 0 14px color-mix(in oklch, var(--mint) 32%, transparent);
+}
+.button[data-variant="primary"],
+.button[data-variant="primary"] * {
+  text-shadow: none;
+}
+.button[data-variant="primary"]:hover:not(:disabled) {
+  background-color: color-mix(in oklch, var(--mint) 82%, white);
+  box-shadow:
+    0 0 0.5px var(--mint),
+    0 0 22px color-mix(in oklch, var(--mint) 55%, transparent);
+}
+.button[data-variant="primary"]:active:not(:disabled) {
+  background-color: color-mix(in oklch, var(--mint) 88%, var(--bg));
+}
+.button[data-variant="primary"]:disabled {
+  background-color: color-mix(in oklch, var(--mint) 35%, var(--bg));
+  border-color: color-mix(in oklch, var(--mint) 35%, var(--bg));
+}

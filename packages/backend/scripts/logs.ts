@@ -1,7 +1,6 @@
 #!/usr/bin/env -S node --import tsx
 import { parseArgs } from "node:util";
 
-import { sanitizeBranchName } from "shared/branch";
 import { askConfirmation, parseDuration, sleep } from "shared/cli-utils";
 import { loadConfig } from "shared/config";
 
@@ -12,26 +11,34 @@ import { BackendStack } from "./lib/backend-stack.js";
 const FETCH_LIMIT = 100;
 const MAX_EVENTS_BEFORE_CONFIRMATION = 100;
 
+type LambdaFunction = "api";
+
+const LAMBDA_FUNCTIONS: Record<LambdaFunction, { suffix: string; description: string }> = {
+  api: { suffix: "", description: "API handler" },
+};
+
 interface CliArgs {
-  name: string;
+  function: LambdaFunction;
   startTime: number;
   tail: boolean;
 }
 
 async function main() {
-  const { name, startTime, tail } = parseCliArgs();
+  const args = parseCliArgs();
   const config = loadConfig();
   const region = config.backend.region;
-  const functionName = BackendStack.functionName({ project: config.project, name });
+  const baseName = BackendStack.functionName({ project: config.project });
+  const { suffix, description } = LAMBDA_FUNCTIONS[args.function];
+  const functionName = `${baseName}${suffix}`;
 
-  console.log(`${tail ? "Tailing" : "Fetching"} logs for ${functionName}...\n`);
-  await fetchLogs(`/aws/lambda/${functionName}`, region, startTime, tail);
+  console.log(`${args.tail ? "Tailing" : "Fetching"} logs for ${functionName} (${description})...\n`);
+  await fetchLogs(`/aws/lambda/${functionName}`, region, args.startTime, args.tail);
 }
 
 function parseCliArgs(): CliArgs {
   const { values } = parseArgs({
     options: {
-      name: { type: "string", short: "n" },
+      function: { type: "string", short: "f" },
       startTime: { type: "string", short: "s" },
       tail: { type: "boolean", short: "t" },
       help: { type: "boolean", short: "h" },
@@ -46,7 +53,8 @@ Usage: ./packages/backend/scripts/logs.ts [options]
 Fetch or tail CloudWatch logs for backend Lambda
 
 Options:
-  -n, --name <name>       Deployment name (required)
+  -f, --function <fn>     Lambda function to read logs from (default: api)
+                          api - API handler (HTTP)
   -s, --startTime <dur>   How far back to fetch logs (default: 1m)
                           Format: <number><unit> where unit is s/m/h/d
                           Examples: 30s, 5m, 1h, 7d
@@ -54,27 +62,21 @@ Options:
   -h, --help              Show this help message
 
 Examples:
-  ./packages/backend/scripts/logs.ts -n main                  # Last 1 minute, exit
-  ./packages/backend/scripts/logs.ts -n main -t               # Last 1 minute, keep tailing
-  ./packages/backend/scripts/logs.ts -n main -s 30m           # Last 30 minutes, exit
-  ./packages/backend/scripts/logs.ts -n main -s 1d -t         # Last 1 day, keep tailing
+  ./packages/backend/scripts/logs.ts          # API logs, last 1 minute
+  ./packages/backend/scripts/logs.ts -t       # API logs, tailing
+  ./packages/backend/scripts/logs.ts -s 1d -t # API logs, last 1 day, tailing
 `);
     process.exit(0);
   }
 
-  if (!values.name) {
-    console.error("Error: --name is required");
-    process.exit(1);
-  }
-
-  const sanitized = sanitizeBranchName(values.name);
-  if (!sanitized) {
-    console.error(`Error: invalid branch name "${values.name}"`);
+  const fn = (values.function ?? "api") as LambdaFunction;
+  if (!(fn in LAMBDA_FUNCTIONS)) {
+    console.error(`Error: --function must be one of: ${Object.keys(LAMBDA_FUNCTIONS).join(", ")}`);
     process.exit(1);
   }
 
   return {
-    name: sanitized,
+    function: fn,
     startTime: parseDuration(values.startTime ?? "1m"),
     tail: values.tail ?? false,
   };
@@ -104,7 +106,6 @@ async function fetchLogs(logGroupName: string, region: string, startTime: number
       totalEvents += events.length;
       nextToken = response.nextToken;
 
-      // If we've hit the threshold and there's more, ask for confirmation
       if (totalEvents >= MAX_EVENTS_BEFORE_CONFIRMATION && nextToken && !askedConfirmation) {
         const lastTs = events.at(-1)?.timestamp;
         const lastTime = lastTs ? new Date(lastTs).toISOString() : "N/A";
@@ -136,4 +137,7 @@ async function fetchLogs(logGroupName: string, region: string, startTime: number
   }
 }
 
-void main();
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

@@ -1,0 +1,32 @@
+/* Fixed scanline overlay — 1px line every 2px (50% coverage). Opacity is
+   driven by --scanline-opacity (defined on :root in global.css) so it can be
+   tuned in one place. Screen blend so the lines add light to the pixels
+   underneath. */
+.screen::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9990;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0 1px,
+    rgba(255, 255, 255, var(--scanline-opacity)) 1px 2px
+  );
+  mix-blend-mode: screen;
+}
+
+/* Edge vignette — pulls focus to center, sells the CRT face. Driven by
+   --vignette-intensity. */
+.screen::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9991;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 55%,
+    rgba(0, 0, 0, var(--vignette-intensity)) 100%
+  );
+}

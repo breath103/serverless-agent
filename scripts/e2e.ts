@@ -1,13 +1,14 @@
 #!/usr/bin/env -S node --import tsx
 import { type Command } from "./e2e/command.js";
 import { start, stop } from "./e2e/commands/lifecycle.js";
-import { navigate, screenshot, runJs, click, type, wait, setViewport, pageText } from "./e2e/commands/browser.js";
+import { navigate, screenshot, runJs, click, type, wait, setViewport, login, pageText } from "./e2e/commands/browser.js";
 
 // --- Commands ---
 
 const commands: Record<string, Command> = {
   start,
   stop,
+  login,
   navigate,
   screenshot,
   "run-js": runJs,

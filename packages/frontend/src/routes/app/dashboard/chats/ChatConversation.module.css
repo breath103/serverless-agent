@@ -1,0 +1,8 @@
+@keyframes fireflyBreathe {
+  0%, 100% { transform: translateY(0) scale(0.7); opacity: 0.25; }
+  50%      { transform: translateY(-2px) scale(1); opacity: 1;   }
+}
+
+.breathe {
+  animation: fireflyBreathe 1.6s ease-in-out infinite;
+}

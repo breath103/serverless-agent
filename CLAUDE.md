@@ -1,99 +1,48 @@
-# Project Instructions
+## General Approach
 
-## Deployment
+- **Before every `git push` or PR merge, run `/code-review` first.** No exceptions. Fix violations before pushing.
+- For every bug or fix you make, consider whether a coding guideline would prevent the same issue in the future. After the task is done, ask the user if they want to `/update-code-review-guideline`.
+- **When the user asks to merge a PR or push to main**, retrospectively review what you learned during the task and run `/update-code-review-guideline` to capture any new patterns, pitfalls, or conventions worth enforcing.
 
-- **CI deploys automatically on merge to main.** Never deploy manually.
-- **Never use `--squash` when merging PRs.** Use `gh pr merge` without `--squash`.
+## Critical Rules
 
-See `documents/coding-guidelines/` for coding standards:
-- `backend.md` - Backend (packages/backend)
-- `frontend.md` - Frontend (packages/frontend)
+- **NEVER run `tsc` or `npx tsc` directly.** Not for any package. Not ever.
+- **For type checking:** `./packages/backend/scripts/build-types.ts` or `./packages/frontend/scripts/build-types.ts`. Run from repo root.
+- **All scripts are executable via shebang** — run them directly, not via `npm run`. No exceptions.
+- **After pulling/merging remote changes**, always run `npm install` from root before doing anything else. If a package appears missing, it's because you forgot to run `npm install` — do NOT add it as a new dependency.
+- **After ANY change to a skill factory** (params, returns, entities, method rename/add/remove under `packages/backend/src/agent-runtime/skill-runtimes/*.ts`), run `./packages/backend/scripts/generate-declarations.ts`. The generated `.d.ts` files are what the LLM sees as the skill's API — typecheck alone will not catch a stale declaration, but the agent will call the wrong shape at runtime. No exceptions.
 
-## Important Rules
+## Pre-push CI parity — run the full CI suite locally before every `git push`
 
-- **Never call `npx` directly.** This project has scripts for everything. Use the provided scripts instead.
+Waiting on a self-hosted CI runner to tell you what a local script would have told you in 20 seconds is pure CPU waste. Before **every** `git push` (feature branch, follow-up fix, whatever), run both CI jobs verbatim. Fix any failure, then push.
 
-## Worktrees
-
-To run multiple instances side-by-side (one per branch), use git worktrees plus a per-checkout `tss.override.json`:
-
-```bash
-git worktree add ../myapp-2 some-branch
-cd ../myapp-2
-npm install
-```
-
-Then create `tss.override.json` (gitignored) in the new worktree:
-
-```json
-{
-  "dev": { "worktree": "2" },
-  "edge":     { "devPort": 3010 },
-  "backend":  { "devPort": 3011 },
-  "frontend": { "devPort": 3012 }
-}
-```
-
-`dev.worktree` combined with `project` namespaces auth cookies (`BETTER_AUTH_COOKIE_PREFIX`), the e2e Chrome CDP port, profile dir, and status file — so two worktrees on `localhost` don't clobber each other's sessions or browsers.
-
-## Running Scripts
-
-All scripts are executable via shebang — no `npm run` or `npx` needed. Run everything from repo root.
-
-### Root-level scripts
+The two jobs in `.github/workflows/deploy.yml` are:
 
 ```bash
-./scripts/dev.ts                # Start all dev servers in foreground (Ctrl-C to stop)
-./scripts/dev.ts start          # Start dev servers in background, return when ready
-./scripts/dev.ts status         # Show running status + per-process pids
-./scripts/dev.ts stop           # Stop background dev server
-./scripts/lint                  # Run linters across packages
-./scripts/e2e.ts start          # Start headless Chrome for e2e
-./scripts/setup.ts              # Interactive project setup
+# Backend job — typecheck + lint + tests
+./packages/backend/scripts/build-types.ts \
+  && ./packages/backend/scripts/lint.ts \
+  && npm test -w backend
+
+# Frontend job — backend types (for cross-package refs) + frontend typecheck + lint + vitest
+./packages/backend/scripts/build-types.ts \
+  && ./packages/frontend/scripts/build-types.ts \
+  && ./packages/frontend/scripts/lint.ts \
+  && npm test -w frontend
 ```
 
-`./scripts/dev.ts start` writes `.dev-status.json` (gitignored) tracking
-foreground pid + per-process readiness. The foreground guarantees no orphans:
+Things a pre-commit hook does **not** catch but CI does:
+- Widening a discriminated union in one package breaks an exhaustive switch in the other package — only the *cross-package* typecheck (frontend typechecks while importing backend types) surfaces it.
+- Test failures (hooks skip tests for speed).
 
-- **Any** subprocess crash (backend, frontend, edge, types) triggers `shutdown()` and tears the whole stack down.
-- A detached `sh` reaper watches the foreground pid; when it dies (gracefully, SIGKILL, or crash), the reaper SIGTERMs the pgroup, sleeps 2s, then SIGKILLs the pgroup. Lives in its own session so the SIGTERM blast doesn't take it down before the SIGKILL.
-- `stop` SIGTERMs the foreground's pgroup directly; the foreground's reaper finishes the job.
+Rule: **don't push until both jobs are green locally**. If it passes locally and fails on CI, that's a real bug.
 
-If you need to inspect what's running: `./scripts/dev/status.ts <pid>` prints the full process tree under a given pid (cwd-annotated).
+## Storage
 
-### Package scripts
+- All persistent state lives in **DynamoDB**. The CDK stack (`packages/backend/scripts/lib/backend-stack.ts`) declares every table. Attribute names mirror the TS row shapes in `packages/backend/src/types/database.ts` — snake_case keys, ISO-string timestamps.
+- Access goes through the DocumentClient singleton in `packages/backend/src/lib/ddb.ts` + typed repos under `packages/backend/src/<domain>/*-repository.ts`.
+- Auth is username + password with scrypt hashing (`packages/backend/src/auth/`) and a TTL-scoped `sessions` table. Session cookie is `sa_session`, HTTP-only, set by `/api/auth/sign-in` and `/api/auth/sign-up`.
 
-```bash
-# Backend
-./packages/backend/scripts/deploy.ts --name=main
-./packages/backend/scripts/build.ts
-./packages/backend/scripts/logs.ts -n main -t
+## Demo constraints
 
-# Frontend
-./packages/frontend/scripts/deploy.ts --name=main
-./packages/frontend/scripts/destroy.ts --name=feature-branch
-
-# Edge
-./packages/edge/scripts/deploy.ts deploy
-./packages/edge/scripts/logs.ts -f origin-request -r us-east-1
-```
-
-### Other common commands
-
-```bash
-./packages/backend/scripts/lint.ts                     # Lint backend
-./packages/backend/scripts/lint.ts --fix               # Lint backend with auto-fix
-./packages/frontend/scripts/lint.ts                    # Lint frontend
-./packages/frontend/scripts/lint.ts --fix              # Lint frontend with auto-fix
-./packages/backend/scripts/build-types.ts              # Type check backend
-./packages/frontend/scripts/build-types.ts             # Type check frontend
-```
-
-Lint scripts use ESLint's content cache by default under `node_modules/.cache/eslint/` so repeated local runs are fast. For final/full verification, run the same lint command with `--no-cache` (for example, `./scripts/lint --no-cache` or `./packages/frontend/scripts/lint.ts --no-cache`) so external rule inputs such as Tailwind CSS config/global CSS cannot leave stale cached results.
-
-### Install packages
-
-```bash
-npm install <package> -w backend
-npm install -D <package> -w frontend  # as devDependency
-```
+- No third-party OAuth integrations, no billable-usage tracking, no radar feature. The agent has two skills: `memory` and `web-search` (Tavily).

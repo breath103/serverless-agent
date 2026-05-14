@@ -1,0 +1,17 @@
+{
+  "tags": ["-public"],
+  "ignoreBinaries": ["tsx", "knip"],
+  "ignoreDependencies": ["tsx"],
+  "entry": [
+    "src/lambda-*/handler.ts",
+    "scripts/*.ts",
+    "src/**/__tests__/*.test.ts"
+  ],
+  "project": [
+    "src/**/*.ts",
+    "scripts/**/*.ts"
+  ],
+  "ignore": [
+    "src/types/**"
+  ]
+}

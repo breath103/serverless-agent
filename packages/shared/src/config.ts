@@ -32,6 +32,22 @@ const configSchema = z.object({
 
 export type TssConfig = z.infer<typeof configSchema>;
 
+// Stable per-worktree namespace: `${project}-${dev.worktree}`. Used as the
+// identity for every per-checkout resource (auth cookie prefix, docker
+// container names, e2e Chrome profile/status file, derived ports).
+export function namespace(cfg: Pick<TssConfig, "project" | "dev">): string {
+  return `${cfg.project}-${cfg.dev.worktree}`;
+}
+
+// Deterministic small offset derived from a string. Lets us pick per-worktree
+// ports off a fixed base (basePort + portOffset(namespace)) without explicit
+// config — different worktrees hash to different offsets.
+export function portOffset(id: string): number {
+  let h = 0;
+  for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return (h % 1000) + 1;
+}
+
 export function frontendBucketName({
   project,
   frontend,

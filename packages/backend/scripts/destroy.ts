@@ -1,7 +1,6 @@
 #!/usr/bin/env -S node --import tsx
 import { parseArgs } from "node:util";
 
-import { sanitizeBranchName } from "shared/branch";
 import { loadConfig } from "shared/config";
 import * as SSMParameters from "shared/ssm-parameters";
 
@@ -19,23 +18,22 @@ import {
 import { BackendStack } from "./lib/backend-stack.js";
 
 async function main() {
-  const { name } = parseCliArgs();
+  parseCliArgs();
 
   const config = loadConfig();
-  const stackName = BackendStack.id({ project: config.project, name });
+  const stackName = BackendStack.id({ project: config.project });
 
   console.log(`\nDestroying backend stack: ${stackName}`);
 
   await deleteStack(stackName, config.backend.region);
-  await deleteSsmParameter(config, name);
+  await deleteSsmParameter(config);
 
-  console.log(`\n✅ Destroyed backend: ${name}`);
+  console.log("\n✅ Destroyed backend");
 }
 
 function parseCliArgs() {
   const { values } = parseArgs({
     options: {
-      name: { type: "string", short: "n" },
       help: { type: "boolean", short: "h" },
     },
     strict: true,
@@ -44,24 +42,6 @@ function parseCliArgs() {
   if (values.help) {
     showHelp();
   }
-
-  if (!values.name) {
-    console.error("Error: --name is required (e.g., --name=feature-branch)");
-    console.error("Run with --help for usage information");
-    process.exit(1);
-  }
-
-  const sanitizedName = sanitizeBranchName(values.name);
-  if (!sanitizedName) {
-    console.error(`Error: branch name "${values.name}" sanitizes to empty string`);
-    process.exit(1);
-  }
-
-  if (sanitizedName !== values.name) {
-    console.log(`Branch name sanitized: "${values.name}" → "${sanitizedName}"`);
-  }
-
-  return { name: sanitizedName };
 }
 
 function showHelp(): never {
@@ -71,13 +51,7 @@ Usage: ./packages/backend/scripts/destroy.ts [options]
 Destroy backend stack from AWS
 
 Options:
-  -n, --name <name>   Deployment name (required)
-                      Usually the branch name (e.g., feature-branch)
   -h, --help          Show this help message
-
-Examples:
-  ./packages/backend/scripts/destroy.ts --name=feature-branch
-  ./packages/backend/scripts/destroy.ts -n feature/my-feature
 `);
   process.exit(0);
 }
@@ -99,14 +73,10 @@ async function deleteStack(stackName: string, region: string): Promise<void> {
 }
 
 async function deleteSsmParameter(
-  config: ReturnType<typeof loadConfig>,
-  name: string
+  config: ReturnType<typeof loadConfig>
 ): Promise<void> {
   const client = new SSMClient({ region: config.ssm.region });
-  const ssmPath = SSMParameters.backendUrlName({
-    project: config.project,
-    sanitizedBranchName: name,
-  });
+  const ssmPath = SSMParameters.backendUrlName({ project: config.project });
 
   console.log(`\nDeleting SSM parameter: ${ssmPath}`);
 
@@ -122,4 +92,7 @@ async function deleteSsmParameter(
   }
 }
 
-void main();
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

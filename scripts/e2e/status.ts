@@ -1,19 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { loadConfig } from "shared/config";
+import { loadConfig, namespace, portOffset } from "shared/config";
 
-const { project, dev } = loadConfig();
+const config = loadConfig();
 
-// project+worktree namespaces e2e state so multiple worktrees (and other projects)
-// can run e2e in parallel without clobbering each other.
-function portOffset(id: string): number {
-  let h = 0;
-  for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return (h % 1000) + 1;
-}
-
-export const NAMESPACE = `${project}-${dev.worktree}`;
+// Per-worktree namespace — same as DDB / future per-checkout resources.
+export const NAMESPACE = namespace(config);
+// CDP port offset from a 9222 base so each worktree's headless Chrome
+// lands on its own port without explicit config.
 export const CDP_PORT = 9222 + portOffset(NAMESPACE);
 
 const E2E_STATUS_FILE = path.join(process.cwd(), `.e2e-status-${NAMESPACE}.json`);
@@ -42,11 +37,11 @@ export function remove() {
 export function requireRunning(): E2eStatus {
   const s = read();
   if (!s) {
-    console.error("Headless Chrome is not running. Start it first: ./scripts/e2e.ts start");
+    console.error(`Headless Chrome (worktree "${NAMESPACE}") is not running. Start it first: ./scripts/e2e.ts start`);
     process.exit(1);
   }
   try { process.kill(s.pid, 0); } catch {
-    console.error("Headless Chrome process is dead. Restart: ./scripts/e2e.ts start");
+    console.error(`Headless Chrome (worktree "${NAMESPACE}") process is dead. Restart: ./scripts/e2e.ts start`);
     remove();
     process.exit(1);
   }

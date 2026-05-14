@@ -1,27 +1,27 @@
 {
   "$schema": "./tss.schema.json",
-  "project": "tsss",
-  "repo": "breath103/tss-stack-template",
+  "project": "serverless-agent",
+  "repo": "breath103/serverless-agent",
   "dev": {
     "worktree": "1"
   },
   "edge": {
-    "devPort": 3000,
+    "devPort": 6001,
     "githubActionsIamRole": true
   },
   "backend": {
-    "region": "ap-northeast-2",
-    "devPort": 3001
+    "region": "us-east-1",
+    "devPort": 6002
   },
   "frontend": {
-    "bucketSuffix": "",
-    "devPort": 3002
-  },  
-  "ssm": {
-    "region": "ap-northeast-2"
+    "bucketSuffix": "prod",
+    "devPort": 6003
   },
-  "domain": "tsss.cloud",
-  "hostedZoneId": "Z0281460Z2VKJY4HRDWP",
+  "ssm": {
+    "region": "us-east-1"
+  },
+  "domain": "serverless-agent.com",
+  "hostedZoneId": "Z09291351NBFLQOBTIHIF",
   "subdomainMap": {
     "": { "redirect": "www" },
     "www": "main",

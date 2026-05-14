@@ -20,7 +20,7 @@
       "properties": {
         "worktree": {
           "type": "string",
-          "description": "Worktree id used as a per-checkout namespace (auth cookie prefix, e2e Chrome data dir/port). Override via tss.override.json in each git worktree to run multiple instances side-by-side."
+          "description": "Worktree id used as a per-checkout namespace (docker container names, derived ports, e2e Chrome data dir/status file). Override via tss.override.json in each git worktree to run multiple instances side-by-side."
         }
       }
     },
@@ -65,7 +65,7 @@
           "description": "Local dev server port"
         }
       }
-    },    
+    },
     "ssm": {
       "type": "object",
       "required": ["region"],

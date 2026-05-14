@@ -2,6 +2,7 @@ import { z } from "zod";
 
 type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 type SchemaShape = Record<string, z.ZodTypeAny>;
+type BodySchema = SchemaShape | z.ZodTypeAny;
 
 // "/users/:id" → "id"
 type ExtractPathParams<T extends string> = T extends `${string}:${infer Param}/${infer Rest}`
@@ -19,10 +20,12 @@ type OptionalUndefined<T> = {
 
 type Simplify<T> = { [K in keyof T]: T[K] };
 
-// Infer zod schema shape, making optional fields actually optional
+// Infer body/query type from schema shape or single zod schema
 type SafeInfer<T> = [T] extends [never]
   ? never
-  : Simplify<OptionalUndefined<{ [K in keyof T]: z.infer<T[K]> }>>;
+  : T extends z.ZodTypeAny
+    ? z.infer<T>
+    : Simplify<OptionalUndefined<{ [K in keyof T]: z.infer<T[K]> }>>;
 
 export interface RouteContext<Context, Path extends string, Query, Body> {
   params: { [K in ExtractPathParams<Path>]: string };
@@ -46,7 +49,7 @@ export type RouteDef<
   // Method syntax is bivariant, avoiding contravariance issues when collecting routes
   handler(ctx: RouteContext<Context, Path, Query, Body>): Promise<Response> | Response;
   querySchema?: SchemaShape;
-  bodySchema?: SchemaShape;
+  bodySchema?: BodySchema;
 };
 
 export function routeFactory<C>() {
@@ -54,7 +57,8 @@ export function routeFactory<C>() {
     const Path extends string,
     const Method extends HttpMethod,
     const Q extends SchemaShape = never,
-    const B extends SchemaShape = never,
+    const B extends BodySchema = never,
+    // eslint-disable-next-line @typescript-eslint/no-restricted-types
     R = unknown,
   >(
     path: Path,
@@ -69,7 +73,7 @@ export function routeFactory<C>() {
       path,
       method,
       handler: config.handler,
-      querySchema: config.query,
+      querySchema: config.query as SchemaShape | undefined,
       bodySchema: config.body,
     };
   };

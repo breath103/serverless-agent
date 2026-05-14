@@ -1,13 +1,10 @@
 import path from "node:path";
 
 import * as cdk from "aws-cdk-lib";
-import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
-import * as route53 from "aws-cdk-lib/aws-route53";
-import * as route53Targets from "aws-cdk-lib/aws-route53-targets";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import { Construct } from "constructs";
 
@@ -19,8 +16,6 @@ const DIST = path.join(ROOT, "dist");
 export interface EdgeStackConfig {
   project: string;
   ssmRegion: string;
-  domain?: string;
-  hostedZoneId?: string;
   frontendBucketName: string;
   githubActionsIamRole?: { repo: string };
 }
@@ -40,10 +35,6 @@ export class EdgeStack extends cdk.Stack {
     return `${project}-edge-origin-request`;
   }
 
-  static viewerRequestFunctionName({ project }: { project: string }): string {
-    return `${project}-edge-viewer-request`;
-  }
-
   constructor(scope: Construct, props: EdgeStackProps) {
     const id = EdgeStack.id({ project: props.config.project });
     super(scope, id, {
@@ -54,27 +45,9 @@ export class EdgeStack extends cdk.Stack {
     const config = props.config;
 
     const originRequestFunction = this.createOriginRequestFunction(config);
-    const viewerRequestFunction = this.createViewerRequestFunction(config);
     const { bucket, oai } = this.createFrontendBucket(config);
-
-    const customDomain =
-      config.domain && config.hostedZoneId
-        ? this.createCertificate({ domain: config.domain, hostedZoneId: config.hostedZoneId })
-        : undefined;
-
-    const distribution = this.createDistribution(
-      config,
-      originRequestFunction,
-      viewerRequestFunction,
-      bucket,
-      oai,
-      customDomain,
-    );
-
-    if (customDomain && config.domain) {
-      this.createDnsRecords(config.domain, customDomain.hostedZone, distribution);
-    }
-    this.createOutputs(config, distribution, bucket);
+    const distribution = this.createDistribution(config, originRequestFunction, bucket, oai);
+    this.createOutputs(distribution, bucket);
 
     if (config.githubActionsIamRole) {
       new GitHubActionsIam(this, "GitHubActionsIam", {
@@ -105,16 +78,6 @@ export class EdgeStack extends cdk.Stack {
     return fn;
   }
 
-  private createViewerRequestFunction(config: EdgeStackConfig): cloudfront.Function {
-    return new cloudfront.Function(this, "ViewerRequestFunction", {
-      functionName: EdgeStack.viewerRequestFunctionName({ project: config.project }),
-      code: cloudfront.FunctionCode.fromFile({
-        filePath: path.join(DIST, "viewer-request/index.js"),
-      }),
-      runtime: cloudfront.FunctionRuntime.JS_2_0,
-    });
-  }
-
   private createFrontendBucket(config: EdgeStackConfig): {
     bucket: s3.Bucket;
     oai: cloudfront.OriginAccessIdentity;
@@ -135,36 +98,15 @@ export class EdgeStack extends cdk.Stack {
     return { bucket, oai };
   }
 
-  private createCertificate(opts: { domain: string; hostedZoneId: string }): {
-    domain: string;
-    hostedZone: route53.IHostedZone;
-    certificate: acm.Certificate;
-  } {
-    const hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, "HostedZone", {
-      hostedZoneId: opts.hostedZoneId,
-      zoneName: opts.domain,
-    });
-
-    const certificate = new acm.Certificate(this, "Certificate", {
-      domainName: `*.${opts.domain}`,
-      subjectAlternativeNames: [opts.domain],
-      validation: acm.CertificateValidation.fromDns(hostedZone),
-    });
-
-    return { domain: opts.domain, hostedZone, certificate };
-  }
-
   private createDistribution(
     config: EdgeStackConfig,
     originRequestFunction: cloudfront.experimental.EdgeFunction,
-    viewerRequestFunction: cloudfront.Function,
     bucket: s3.Bucket,
-    oai: cloudfront.OriginAccessIdentity,
-    customDomain: { domain: string; certificate: acm.Certificate } | undefined,
+    oai: cloudfront.OriginAccessIdentity
   ): cloudfront.Distribution {
     const cachePolicy = new cloudfront.CachePolicy(this, "FrontendCachePolicy", {
       cachePolicyName: `${config.project}-frontend`,
-      headerBehavior: cloudfront.CacheHeaderBehavior.allowList("x-branch"),
+      headerBehavior: cloudfront.CacheHeaderBehavior.none(),
       queryStringBehavior: cloudfront.CacheQueryStringBehavior.none(),
       cookieBehavior: cloudfront.CacheCookieBehavior.none(),
       defaultTtl: cdk.Duration.days(1),
@@ -182,15 +124,10 @@ export class EdgeStack extends cdk.Stack {
       { functionVersion: originRequestFunction.currentVersion, eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST },
     ];
 
-    const functionAssociations: cloudfront.FunctionAssociation[] = [
-      { function: viewerRequestFunction, eventType: cloudfront.FunctionEventType.VIEWER_REQUEST },
-    ];
-
     const defaultBehavior: cloudfront.BehaviorOptions = {
       origin: s3Origin,
       viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
       cachePolicy,
-      functionAssociations,
       edgeLambdas,
     };
 
@@ -200,44 +137,16 @@ export class EdgeStack extends cdk.Stack {
       allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
       cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
       originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
-      functionAssociations,
       edgeLambdas,
     };
 
     return new cloudfront.Distribution(this, "Distribution", {
       defaultBehavior,
       additionalBehaviors: { "/api/*": apiBehavior },
-      ...(customDomain
-        ? {
-            certificate: customDomain.certificate,
-            domainNames: [`*.${customDomain.domain}`, customDomain.domain],
-          }
-        : {}),
-    });
-  }
-
-  private createDnsRecords(
-    domain: string,
-    hostedZone: route53.IHostedZone,
-    distribution: cloudfront.Distribution
-  ): void {
-    const target = route53.RecordTarget.fromAlias(new route53Targets.CloudFrontTarget(distribution));
-
-    new route53.ARecord(this, "WildcardARecord", {
-      zone: hostedZone,
-      recordName: `*.${domain}`,
-      target,
-    });
-
-    new route53.ARecord(this, "RootARecord", {
-      zone: hostedZone,
-      recordName: domain,
-      target,
     });
   }
 
   private createOutputs(
-    _config: EdgeStackConfig,
     distribution: cloudfront.Distribution,
     bucket: s3.Bucket
   ): void {

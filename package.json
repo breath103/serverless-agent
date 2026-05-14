@@ -1,5 +1,5 @@
 {
-  "name": "tss-stack-template",
+  "name": "serverless-agent",
   "private": true,
   "workspaces": [
     "packages/*"
@@ -8,7 +8,6 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@aws-sdk/client-route-53": "^3.700.0",
     "concurrently": "^9.2.1",
     "husky": "^9.1.7",
     "playwright": "^1.58.2",

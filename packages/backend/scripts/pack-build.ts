@@ -15,6 +15,11 @@ function main() {
   console.log("Transpiling TypeScript...");
   execSync("npx tsc --outDir dist", { cwd: ROOT, stdio: "inherit" });
 
+  // Copy non-TS assets that are read at runtime (tsc doesn't copy these)
+  const DECLARATIONS_SRC = path.join(ROOT, "src/agent-runtime/declarations");
+  const DECLARATIONS_DEST = path.join(DIST, "agent-runtime/declarations");
+  fs.cpSync(DECLARATIONS_SRC, DECLARATIONS_DEST, { recursive: true });
+
   // Copy package.json with only production dependencies
   const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf-8")) as {
     name: string;

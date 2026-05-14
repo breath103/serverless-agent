@@ -3,7 +3,6 @@ import * as readline from "readline";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { Route53Client, ListHostedZonesByNameCommand, GetHostedZoneCommand } from "@aws-sdk/client-route-53";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -41,62 +40,7 @@ async function askRegion(): Promise<string> {
   return (await ask(`AWS region for backend [${defaultRegion}]: `)) || defaultRegion;
 }
 
-async function askDomain(): Promise<string | undefined> {
-  const domain = await ask("Domain (e.g., myapp.com) [leave blank to use generated CloudFront domain]: ");
-  if (!domain) return undefined;
-  if (!domain.includes(".")) {
-    console.error("Error: Invalid domain");
-    process.exit(1);
-  }
-  return domain;
-}
-
-async function findHostedZone(domain: string): Promise<string> {
-  console.log("\nLooking up Route53 hosted zone...");
-  const route53 = new Route53Client({ region: "us-east-1" });
-
-  let hostedZoneId = "";
-  try {
-    const listResult = await route53.send(
-      new ListHostedZonesByNameCommand({ DNSName: domain, MaxItems: 1 })
-    );
-    const zone = listResult.HostedZones?.find((z) => z.Name === `${domain}.`);
-    if (zone?.Id) {
-      hostedZoneId = zone.Id.replace("/hostedzone/", "");
-      console.log(`Found hosted zone: ${hostedZoneId}`);
-    }
-  } catch {
-    console.log("Could not auto-detect hosted zone (check AWS credentials)");
-  }
-
-  if (!hostedZoneId) {
-    hostedZoneId = await ask("Enter Route53 Hosted Zone ID manually: ");
-  }
-
-  if (!hostedZoneId) {
-    console.error("Error: Hosted Zone ID is required");
-    process.exit(1);
-  }
-
-  // Verify
-  try {
-    const zoneResult = await route53.send(new GetHostedZoneCommand({ Id: hostedZoneId }));
-    console.log(`Verified hosted zone: ${zoneResult.HostedZone?.Name}`);
-  } catch {
-    console.error("Error: Could not verify hosted zone. Check your AWS credentials and zone ID.");
-    process.exit(1);
-  }
-
-  return hostedZoneId;
-}
-
-function buildConfig(
-  project: string,
-  repo: string,
-  region: string,
-  domain: string | undefined,
-  hostedZoneId: string | undefined,
-) {
+function buildConfig(project: string, repo: string, region: string) {
   return {
     $schema: "./tss.schema.json",
     project,
@@ -105,11 +49,6 @@ function buildConfig(
     backend: { region, devPort: 3001 },
     frontend: { bucketSuffix: "", devPort: 3002 },
     ssm: { region },
-    ...(domain ? { domain } : {}),
-    ...(hostedZoneId ? { hostedZoneId } : {}),
-    subdomainMap: domain
-      ? { "": "main", "www": "main", "main": null }
-      : { "": "main" },
   };
 }
 
@@ -132,15 +71,13 @@ function copyEnvSamples() {
 }
 
 async function main() {
-  console.log("\n🚀 TSS Stack Setup\n");
+  console.log("\n🚀 Serverless-Agent Setup\n");
 
   const project = await askProject();
   const repo = await askRepo();
   const region = await askRegion();
-  const domain = await askDomain();
-  const hostedZoneId = domain ? await findHostedZone(domain) : undefined;
 
-  const config = buildConfig(project, repo, region, domain, hostedZoneId);
+  const config = buildConfig(project, repo, region);
 
   console.log("\n📋 Configuration:\n");
   console.log(JSON.stringify(config, null, 2));
@@ -157,8 +94,8 @@ async function main() {
   console.log("\nNext steps:");
   console.log("  1. Edit packages/backend/.env with your secrets");
   console.log("  2. ./packages/edge/scripts/deploy.ts deploy  # Deploy CloudFront + Lambda@Edge");
-  console.log("  3. ./packages/backend/scripts/deploy.ts --name=main");
-  console.log("  4. ./packages/frontend/scripts/deploy.ts --name=main");
+  console.log("  3. ./packages/backend/scripts/deploy.ts --env=production");
+  console.log("  4. ./packages/frontend/scripts/deploy.ts --env=production");
 
   rl.close();
 }

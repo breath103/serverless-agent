@@ -5,7 +5,6 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 
 import { config as dotenvConfig } from "dotenv";
-import { sanitizeBranchName } from "shared/branch";
 import { frontendBucketName, loadConfig } from "shared/config";
 
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
@@ -18,7 +17,6 @@ const DIST = path.join(ROOT, "dist");
 function parseCliArgs() {
   const { values } = parseArgs({
     options: {
-      name: { type: "string", short: "n" },
       env: { type: "string", short: "e" },
       help: { type: "boolean", short: "h" },
     },
@@ -29,23 +27,13 @@ function parseCliArgs() {
     showHelp();
   }
 
-  if (!values.name) {
-    console.error("Error: --name is required (e.g., --name=main)");
+  if (!values.env) {
+    console.error("Error: --env is required (e.g., --env=production)");
     console.error("Run with --help for usage information");
     process.exit(1);
   }
 
-  const sanitizedName = sanitizeBranchName(values.name);
-  if (!sanitizedName) {
-    console.error(`Error: branch name "${values.name}" sanitizes to empty string`);
-    process.exit(1);
-  }
-
-  if (sanitizedName !== values.name) {
-    console.log(`Branch name sanitized: "${values.name}" → "${sanitizedName}"`);
-  }
-
-  return { name: sanitizedName, env: values.env };
+  return { env: values.env };
 }
 
 function showHelp(): never {
@@ -55,23 +43,18 @@ Usage: ./packages/frontend/scripts/deploy.ts [options]
 Deploy frontend to S3
 
 Options:
-  -n, --name <name>   Deployment name (required)
-                      Usually the branch name (e.g., main, staging, feature-x)
-  -e, --env <env>     Environment file suffix (optional)
-                      Loads .env.<env> instead of .env
-                      Example: --env=production loads .env.production
+  -e, --env <env>     Environment file suffix (required)
+                      Loads .env.<env>
   -h, --help          Show this help message
 
 Examples:
-  ./packages/frontend/scripts/deploy.ts --name=main
-  ./packages/frontend/scripts/deploy.ts --name=main --env=production
-  ./packages/frontend/scripts/deploy.ts -n staging -e staging
+  ./packages/frontend/scripts/deploy.ts --env=production
 `);
   process.exit(0);
 }
 
-function loadEnvAndBuild(env: string | undefined): void {
-  const envFile = env ? `.env.${env}` : ".env";
+function loadEnvAndBuild(env: string): void {
+  const envFile = `.env.${env}`;
   dotenvConfig({ path: path.join(ROOT, envFile) });
   console.log(`Building frontend with ${envFile}...`);
   execSync("npx vite build", { stdio: "inherit", cwd: ROOT, env: process.env });
@@ -80,7 +63,6 @@ function loadEnvAndBuild(env: string | undefined): void {
 async function uploadDir(
   s3: S3Client,
   bucketName: string,
-  deployName: string,
   dir: string,
   prefix: string
 ): Promise<void> {
@@ -90,11 +72,11 @@ async function uploadDir(
     const fullPath = path.join(dir, entry.name);
 
     if (entry.isDirectory()) {
-      await uploadDir(s3, bucketName, deployName, fullPath, `${prefix}${entry.name}/`);
+      await uploadDir(s3, bucketName, fullPath, `${prefix}${entry.name}/`);
     } else {
       const filePath = `${prefix}${entry.name}`;
       const cacheControl = getCacheControl(filePath);
-      const key = `${deployName}/${filePath}`;
+      const key = filePath;
 
       await s3.send(
         new PutObjectCommand({
@@ -153,7 +135,7 @@ function getContentType(filename: string): string {
 }
 
 async function main() {
-  const { name, env } = parseCliArgs();
+  const { env } = parseCliArgs();
 
   loadEnvAndBuild(env);
 
@@ -161,9 +143,9 @@ async function main() {
   const bucketName = frontendBucketName(config);
   const s3 = new S3Client({ region: "us-east-1" });
 
-  console.log(`\nUploading to s3://${bucketName}/${name}/...`);
-  await uploadDir(s3, bucketName, name, DIST, "");
+  console.log(`\nUploading to s3://${bucketName}/...`);
+  await uploadDir(s3, bucketName, DIST, "");
 
-  console.log(`\n✅ Deployed to s3://${bucketName}/${name}/`);
+  console.log(`\n✅ Deployed to s3://${bucketName}/`);
 }
 void main();

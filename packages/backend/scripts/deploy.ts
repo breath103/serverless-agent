@@ -4,34 +4,35 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 
 import * as cdk from "aws-cdk-lib";
-import { sanitizeBranchName } from "shared/branch";
 import { loadConfig } from "shared/config";
 import * as SSMParameters from "shared/ssm-parameters";
+
+import { DescribeEndpointCommand, IoTClient } from "@aws-sdk/client-iot";
 
 import { BackendStack } from "./lib/backend-stack.js";
 import { loadEnv } from "./lib/env.js";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 
-function main() {
-  const { name, env } = parseCliArgs();
+async function main() {
+  const { env } = parseCliArgs();
 
   const envVars = loadEnv(env);
   build();
 
   const config = loadConfig();
-  const stackName = synthesizeStack(config, name, envVars);
+  const mqttBrokerUrl = await getIotEndpoint(config.backend.region);
+  const stackName = synthesizeStack(config, envVars, mqttBrokerUrl);
 
   deploy(stackName);
-  storeUrlInSsm(stackName, name, config);
+  storeUrlInSsm(stackName, config);
 
-  console.log(`\n✅ Deployed backend: ${name}`);
+  console.log("\n✅ Deployed backend");
 }
 
 function parseCliArgs() {
   const { values } = parseArgs({
     options: {
-      name: { type: "string", short: "n" },
       env: { type: "string", short: "e" },
       help: { type: "boolean", short: "h" },
     },
@@ -42,23 +43,13 @@ function parseCliArgs() {
     showHelp();
   }
 
-  if (!values.name) {
-    console.error("Error: --name is required (e.g., --name=main)");
+  if (!values.env) {
+    console.error("Error: --env is required (e.g., --env=production)");
     console.error("Run with --help for usage information");
     process.exit(1);
   }
 
-  const sanitizedName = sanitizeBranchName(values.name);
-  if (!sanitizedName) {
-    console.error(`Error: branch name "${values.name}" sanitizes to empty string`);
-    process.exit(1);
-  }
-
-  if (sanitizedName !== values.name) {
-    console.log(`Branch name sanitized: "${values.name}" → "${sanitizedName}"`);
-  }
-
-  return { name: sanitizedName, env: values.env };
+  return { env: values.env };
 }
 
 function showHelp(): never {
@@ -68,17 +59,14 @@ Usage: ./packages/backend/scripts/deploy.ts [options]
 Deploy backend to AWS Lambda
 
 Options:
-  -n, --name <name>   Deployment name (required)
-                      Usually the branch name (e.g., main, staging, feature-x)
-  -e, --env <env>     Environment file suffix (optional)
-                      Loads .env.<env> instead of .env
+  -e, --env <env>     Environment file suffix (required)
+                      Loads .env.<env>
                       Example: --env=production loads .env.production
   -h, --help          Show this help message
 
 Examples:
-  ./packages/backend/scripts/deploy.ts --name=main
-  ./packages/backend/scripts/deploy.ts --name=main --env=production
-  ./packages/backend/scripts/deploy.ts -n staging -e staging
+  ./packages/backend/scripts/deploy.ts --env=production
+  ./packages/backend/scripts/deploy.ts -e staging
 `);
   process.exit(0);
 }
@@ -88,20 +76,27 @@ function build(): void {
   execSync("./scripts/build.ts", { stdio: "inherit", cwd: ROOT });
 }
 
+async function getIotEndpoint(region: string): Promise<string> {
+  const iot = new IoTClient({ region });
+  const { endpointAddress } = await iot.send(new DescribeEndpointCommand({ endpointType: "iot:Data-ATS" }));
+  if (!endpointAddress) throw new Error("Failed to get IoT endpoint");
+  return `mqtts://${endpointAddress}:8883`;
+}
+
 function synthesizeStack(
   config: ReturnType<typeof loadConfig>,
-  name: string,
-  envVars: Record<string, string>
+  envVars: Record<string, string>,
+  mqttBrokerUrl: string,
 ): string {
-  console.log(`\nDeploying ${name} to ${config.backend.region} (project: ${config.project})...`);
+  console.log(`\nDeploying to ${config.backend.region} (project: ${config.project})...`);
 
   const app = new cdk.App({ outdir: path.join(ROOT, "cdk.out") });
-  const stackId = BackendStack.id({ project: config.project, name });
+  const stackId = BackendStack.id({ project: config.project });
 
   const stack = new BackendStack(app, {
     project: config.project,
-    name,
     envVars,
+    mqttBrokerUrl,
     env: {
       account: process.env.CDK_DEFAULT_ACCOUNT,
       region: config.backend.region,
@@ -109,7 +104,6 @@ function synthesizeStack(
   });
 
   cdk.Tags.of(stack).add("project", config.project);
-  cdk.Tags.of(stack).add("environment", name);
 
   app.synth();
   return stackId;
@@ -124,7 +118,6 @@ function deploy(stackName: string): void {
 
 function storeUrlInSsm(
   stackName: string,
-  name: string,
   config: ReturnType<typeof loadConfig>
 ): void {
   const functionUrl = execSync(
@@ -132,10 +125,7 @@ function storeUrlInSsm(
     { encoding: "utf-8" }
   ).trim();
 
-  const ssmPath = SSMParameters.backendUrlName({
-    project: config.project,
-    sanitizedBranchName: name,
-  });
+  const ssmPath = SSMParameters.backendUrlName({ project: config.project });
 
   console.log(`\nStoring Function URL in SSM: ${ssmPath}`);
   execSync(
@@ -146,4 +136,7 @@ function storeUrlInSsm(
   console.log(`\n✅ Deployed: ${functionUrl}`);
 }
 
-main();
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

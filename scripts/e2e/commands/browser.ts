@@ -34,7 +34,11 @@ export const screenshot = new Command("Take screenshot",
   z.tuple([z.string().describe("out-path").optional()]),
   (outPath) => withPage(async (page) => {
     const out = outPath ?? path.join(TMP_DIR, `screenshot-${Date.now()}.png`);
-    await page.screenshot({ path: out, fullPage: true });
+    // animations:"disabled" pauses framer-motion / CSS / Web Animations so
+    // fullPage captures don't race infinite loops. timeout: 5000 fails fast
+    // instead of the 30s default — when a screenshot does go wrong, you
+    // find out in 5s.
+    await page.screenshot({ path: out, fullPage: true, animations: "disabled", timeout: 5000 });
     console.log(out);
   }),
 );
@@ -76,6 +80,21 @@ export const setViewport = new Command("Set viewport size",
   (w, h) => withPage(async (page) => {
     await page.setViewportSize({ width: w, height: h });
     console.log(`viewport set to ${w}x${h}`);
+  }),
+);
+
+export const login = new Command("Authenticate as dev user", z.tuple([]),
+  () => withPage(async (page) => {
+    await page.goto(edgeUrl);
+    const result = await page.evaluate(async () => {
+      const res = await fetch("/api/auth/dev-login", { method: "POST" });
+      return { status: res.status, ok: res.ok };
+    });
+    if (!result.ok) {
+      console.error(`Login failed with status ${result.status}`);
+      process.exit(1);
+    }
+    console.log("logged in as dev user");
   }),
 );
 

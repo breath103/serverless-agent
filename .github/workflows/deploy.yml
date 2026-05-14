@@ -1,4 +1,4 @@
-name: Deploy
+name: CI
 
 on:
   push:
@@ -7,8 +7,8 @@ on:
       - "**"
 
 concurrency:
-  group: deploy-${{ github.ref }}
-  cancel-in-progress: false
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
@@ -18,90 +18,14 @@ jobs:
       matrix:
         include:
           - name: Build & Lint & Test backend
-            command: ./packages/backend/scripts/build-types.ts && ./packages/backend/scripts/lint.ts && cd packages/backend && npx tsx --test src/**/__tests__/**/*.test.ts
+            command: ./packages/backend/scripts/build-types.ts && ./packages/backend/scripts/lint.ts && npm test -w backend
           - name: Build & Lint & Test frontend
-            command: ./packages/backend/scripts/build-types.ts && ./packages/frontend/scripts/build-types.ts && ./packages/frontend/scripts/lint.ts && cd packages/frontend && ../../scripts/with-env.sh --env=test npx vitest run
+            command: ./packages/backend/scripts/build-types.ts && ./packages/frontend/scripts/build-types.ts && ./packages/frontend/scripts/lint.ts && npm test -w frontend
     name: ${{ matrix.name }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
-          cache: npm
-      - uses: actions/cache@v4
-        id: nm-cache
-        with:
-          path: node_modules
-          key: node-modules-${{ hashFiles('package-lock.json') }}
-      - if: steps.nm-cache.outputs.cache-hit != 'true'
-        run: npm ci
+      - run: npm ci
       - run: ${{ matrix.command }}
-
-  deploy:
-    needs: check
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: ".nvmrc"
-          cache: npm
-      - uses: actions/cache@v4
-        id: nm-cache
-        with:
-          path: node_modules
-          key: node-modules-${{ hashFiles('package-lock.json') }}
-      - if: steps.nm-cache.outputs.cache-hit != 'true'
-        run: npm ci
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: us-east-1
-
-      - run: ./packages/backend/scripts/pack-build.ts
-      - uses: actions/cache@v4
-        id: deploy-deps
-        with:
-          path: packages/backend/dist/node_modules
-          key: backend-deploy-deps-${{ hashFiles('packages/backend/package.json') }}
-      - if: steps.deploy-deps.outputs.cache-hit != 'true'
-        run: ./packages/backend/scripts/pack-install.ts
-      - name: Deploy backend
-        env:
-          # packages/backend/src/env.d.ts
-          REQUIRED_FOO: "required-backend-value"
-          OPTIONAL_FOO: "optional-backend-value"
-          GOOGLE_CLIENT_ID: "495965151122-nqsuprf3r5e9r8soqa5p15ini6sijhe0.apps.googleusercontent.com"
-          GOOGLE_CLIENT_SECRET: "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"
-          BETTER_AUTH_SECRET: "RHY2DJS7bHHqwc6/+gSYx5pfx+lwt+epje+7bxjIWuY="
-        run: ./packages/backend/scripts/deploy.ts --name=${{ github.ref_name }}
-
-      - name: Deploy frontend
-        env:
-          # packages/frontend/src/env.d.ts
-          SITE_URL: "https://www.tsss.cloud"
-          REQUIRED_FOO: "frontend-value"
-          # OPTIONAL_FOO: ""
-        run: ./packages/frontend/scripts/deploy.ts --name=${{ github.ref_name }}
-
-  # notify:
-  #   needs: [check, deploy]
-  #   if: always() && (failure() || (success() && github.ref == 'refs/heads/main'))
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Notify Telegram
-  #       run: |
-  #         STATUS="${{ needs.deploy.result == 'success' && '✅ Deploy Success' || '❌ CI Failed' }}"
-  #         curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-  #           -H "Content-Type: application/json" \
-  #           -d '{
-  #             "chat_id": 647533447,
-  #             "parse_mode": "Markdown",
-  #             "text": "*'"$STATUS"'*\n\nBranch: `${{ github.ref_name }}`\nCommit: `${{ github.sha }}`\n\n[View Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-  #           }'

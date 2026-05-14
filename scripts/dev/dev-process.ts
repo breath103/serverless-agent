@@ -57,7 +57,6 @@ export class DevProcess {
 
   kill(): void {
     this._killed = true;
-    try { this.child.kill("SIGTERM"); } catch { /* already dead */ }
   }
 
   private pipe(data: Buffer, stream: NodeJS.WriteStream) {

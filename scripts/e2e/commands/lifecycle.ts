@@ -22,6 +22,15 @@ async function waitForCdp(port: number, timeoutMs = 10_000): Promise<string> {
   throw new Error(`Timed out waiting for CDP on port ${port}`);
 }
 
+async function portInUse(port: number): Promise<boolean> {
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/json/version`, { signal: AbortSignal.timeout(500) });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export const start = new Command("Start headless Chrome (stores CDP endpoint)", z.tuple([]), async () => {
   const existing = status.read();
   if (existing) {
@@ -34,12 +43,27 @@ export const start = new Command("Start headless Chrome (stores CDP endpoint)", 
     }
   }
 
+  // Fail loudly if something else is already on the CDP port — otherwise
+  // `waitForCdp` below silently connects to the squatter, and every
+  // subsequent command talks to someone else's browser. Symptom:
+  // page.screenshot() hangs because the other project's Chrome refuses
+  // to capture (or is long dead / wedged).
+  if (await portInUse(status.CDP_PORT)) {
+    console.error(`CDP port ${status.CDP_PORT} is already in use by another process.`);
+    console.error(`Likely a stale headless Chrome from another worktree. Find and kill it:`);
+    console.error(`  lsof -i :${status.CDP_PORT} -P`);
+    process.exit(1);
+  }
+
   const chrome = spawn(chromium.executablePath(), [
+    // --headless=new (the default since Chrome 132) is a real browser, can
+    // raster frames, and screenshots work. The legacy --headless=old +
+    // --disable-gpu combo silently hangs Page.captureScreenshot because
+    // there's no rasterizer wired up. Don't downgrade either flag.
     "--headless=new",
     `--remote-debugging-port=${status.CDP_PORT}`,
     "--no-first-run",
     "--no-default-browser-check",
-    "--disable-gpu",
     "--disable-extensions",
     "--disable-background-networking",
     "--disable-sync",
@@ -55,7 +79,7 @@ export const start = new Command("Start headless Chrome (stores CDP endpoint)", 
 
   const endpoint = await waitForCdp(status.CDP_PORT);
   status.write({ cdpEndpoint: endpoint, pid: chrome.pid });
-  console.log(`started | pid:${chrome.pid} | ${endpoint}`);
+  console.log(`started | worktree:${status.NAMESPACE} | pid:${chrome.pid} | ${endpoint}`);
 });
 
 export const stop = new Command("Stop headless Chrome", z.tuple([]), async () => {

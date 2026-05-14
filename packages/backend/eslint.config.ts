@@ -7,7 +7,7 @@ import eslint from "@eslint/js";
 import stylistic, { type RuleOptions as StylisticRuleOptions } from "@stylistic/eslint-plugin";
 
 export default [
-  { ignores: ["dist/**", "cdk.out/**"] },
+  { ignores: ["dist/**", "cdk.out/**", "src/types/database.generated.ts", "src/**/declarations/**/*.d.ts", "src/**/agent-runtime.e2e/**"] },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   stylistic.configs.customize({
@@ -53,8 +53,14 @@ export default [
       "comma-spacing": ["error", { before: false, after: true }],
       "@typescript-eslint/no-unnecessary-condition": ["error", { allowConstantLoopConditions: true }],
       "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-restricted-types": ["error", {
+        types: {
+          unknown: { message: "Use a specific type. Add an eslint-disable comment if unknown is intentional." },
+        },
+      }],
       "@typescript-eslint/no-inferrable-types": "error",
       "@typescript-eslint/require-await": "warn",
+      "@typescript-eslint/no-base-to-string": "off",
       "simple-import-sort/imports": ["error", {
         groups: [
           ["^node:"],
@@ -72,6 +78,13 @@ export default [
     files: ["src/**/__tests__/**/*.ts"],
     rules: {
       "@typescript-eslint/no-floating-promises": "off",
+    },
+  },
+  {
+    files: ["src/**/declarations/**/*.d.ts"],
+    rules: {
+      "@typescript-eslint/no-restricted-types": "off",
+      "@typescript-eslint/no-empty-object-type": "off",
     },
   },
 ];

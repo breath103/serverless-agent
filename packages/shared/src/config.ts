@@ -2,15 +2,6 @@ import fs from "fs";
 import path from "path";
 import { z } from "zod";
 
-// Subdomain mapping value: deployment name, null (blocked), or redirect
-const subdomainMapValue = z.union([
-  z.string(),
-  z.null(),
-  z.object({ redirect: z.string() }),
-]);
-
-export type SubdomainMapValue = z.infer<typeof subdomainMapValue>;
-
 const configSchema = z.object({
   project: z.string(),
   repo: z.string(),
@@ -22,15 +13,25 @@ const configSchema = z.object({
   backend: z.object({ region: z.string(), devPort: z.number() }),
   frontend: z.object({ bucketSuffix: z.string(), devPort: z.number() }),
   ssm: z.object({ region: z.string() }),
-  domain: z.string().optional(),
-  hostedZoneId: z.string().optional(),
-  subdomainMap: z.record(z.string(), subdomainMapValue),
-}).refine(
-  (cfg) => !cfg.domain || !!cfg.hostedZoneId,
-  { message: "hostedZoneId is required when domain is set", path: ["hostedZoneId"] },
-);
+});
 
 export type TssConfig = z.infer<typeof configSchema>;
+
+// Stable per-worktree namespace: `${project}-${dev.worktree}`. Used as the
+// identity for every per-checkout resource (auth cookie prefix, docker
+// container names, e2e Chrome profile/status file, derived ports).
+export function namespace(cfg: Pick<TssConfig, "project" | "dev">): string {
+  return `${cfg.project}-${cfg.dev.worktree}`;
+}
+
+// Deterministic small offset derived from a string. Lets us pick per-worktree
+// ports off a fixed base (basePort + portOffset(namespace)) without explicit
+// config — different worktrees hash to different offsets.
+export function portOffset(id: string): number {
+  let h = 0;
+  for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return (h % 1000) + 1;
+}
 
 export function frontendBucketName({
   project,

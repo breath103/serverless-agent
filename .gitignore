@@ -5,7 +5,9 @@ cdk.out
 .DS_Store
 .tmp
 
-# Environment files (contain secrets)
+# Environment files — never committed; each dev keeps their own .env locally.
+# `.env.test` IS committed: it holds placeholder values used by CI + local
+# test runs.
 .env
 .env.development
 .env.production
@@ -13,11 +15,20 @@ cdk.out
 # Claude local settings
 .claude/settings.local.json
 
-# Dev server status
-.dev-status.json
-
-# E2E browser status
+# E2E browser status (per-worktree files: .e2e-status-${project}-${dev.worktree}.json)
 .e2e-status-*.json
 
 # Local config overrides
 tss.override.json
+
+# Dev server status
+.dev-status.json
+
+# Agent local workspace
+.agent-workspace
+
+# Assign-task skill state
+.assign-task-state
+
+# Temp files
+.tmp

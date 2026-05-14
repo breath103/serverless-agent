@@ -8,6 +8,12 @@ if [ -n "$BACKEND_STAGED" ]; then
   echo "Backend files changed, running lint --fix..."
   ./packages/backend/scripts/lint.ts --fix
   echo "$BACKEND_STAGED" | xargs git add
+
+  echo "Backend files changed, running knip..."
+  npm run -w backend knip
+
+  echo "Backend files changed, running type check..."
+  ./packages/backend/scripts/build-types.ts
 fi
 
 FRONTEND_STAGED=$(echo "$STAGED_FILES" | grep -E "^packages/frontend/" || true)
@@ -15,4 +21,11 @@ if [ -n "$FRONTEND_STAGED" ]; then
   echo "Frontend files changed, running lint --fix..."
   ./packages/frontend/scripts/lint.ts --fix
   echo "$FRONTEND_STAGED" | xargs git add
+
+  # Frontend type check depends on backend declarations
+  if [ -z "$BACKEND_STAGED" ]; then
+    ./packages/backend/scripts/build-types.ts
+  fi
+  echo "Frontend files changed, running type check..."
+  ./packages/frontend/scripts/build-types.ts
 fi

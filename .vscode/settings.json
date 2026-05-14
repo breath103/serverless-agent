@@ -1,4 +1,8 @@
 {
+    "cSpell.words": [
+        "posthog",
+        "websearch"
+    ],
     "eslint.workingDirectories": [
         { "directory": "packages/frontend", "changeProcessCWD": true },
         { "directory": "packages/backend", "changeProcessCWD": true },

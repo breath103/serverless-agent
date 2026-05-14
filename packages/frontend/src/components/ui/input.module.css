@@ -1,0 +1,59 @@
+/* Terminal-HUD input.
+   Transparent fill, amber hairline border, mono uppercase placeholder.
+   On focus, border switches to mint and the bloom intensifies — same trick as
+   the button.
+*/
+
+.input {
+  color: var(--text-1);
+  background: transparent;
+  border: 1px solid var(--amber);
+  border-radius: 0;
+  letter-spacing: 0.04em;
+  caret-color: var(--amber);
+  box-shadow:
+    0 0 0.5px var(--amber),
+    0 0 5px color-mix(in oklch, var(--amber) 18%, transparent);
+  transition:
+    border-color 0.15s linear,
+    box-shadow 0.15s linear,
+    color 0.15s linear;
+}
+
+.input::placeholder {
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 1;
+}
+
+.input:hover:not(:disabled) {
+  box-shadow:
+    0 0 0.5px var(--amber),
+    0 0 8px color-mix(in oklch, var(--amber) 28%, transparent);
+}
+
+.input:focus,
+.input:focus-visible {
+  border-color: var(--mint);
+  caret-color: var(--mint);
+  outline: none;
+  box-shadow:
+    0 0 0.5px var(--mint),
+    0 0 10px color-mix(in oklch, var(--mint) 38%, transparent);
+}
+
+.input[aria-invalid="true"],
+.input.invalid {
+  border-color: var(--red);
+  caret-color: var(--red);
+  box-shadow:
+    0 0 0.5px var(--red),
+    0 0 8px color-mix(in oklch, var(--red) 32%, transparent);
+}
+
+.input:disabled {
+  color: var(--text-3);
+  border-color: var(--amber-hair);
+  box-shadow: 0 0 0.5px var(--amber-hair);
+}

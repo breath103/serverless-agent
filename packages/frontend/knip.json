@@ -1,0 +1,16 @@
+{
+  "ignoreBinaries": ["tsx", "tsc", "knip", "eslint"],
+  "ignoreDependencies": [
+    "tsx",
+    "@fontsource-variable/inter",
+    "tailwindcss",
+    "tw-animate-css"
+  ],
+  "entry": [
+    "scripts/*.ts"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "scripts/**/*.ts"
+  ]
+}

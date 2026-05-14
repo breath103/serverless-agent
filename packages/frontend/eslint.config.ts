@@ -1,4 +1,4 @@
-import type { Linter } from "eslint";
+import type { Linter, Rule } from "eslint";
 import betterTailwindcss from "eslint-plugin-better-tailwindcss";
 import reactHooks from "eslint-plugin-react-hooks";
 import simpleImportSort from "eslint-plugin-simple-import-sort";
@@ -7,6 +7,26 @@ import tseslint from "typescript-eslint";
 
 import eslint from "@eslint/js";
 import stylistic, { type RuleOptions as StylisticRuleOptions } from "@stylistic/eslint-plugin";
+
+function createMaxLinesRule(max: number, message: string): { plugin: { rules: Record<string, Rule.RuleModule> }; rule: Linter.RuleEntry } {
+  const rule: Rule.RuleModule = {
+    meta: { type: "suggestion", schema: [] },
+    create(context) {
+      return {
+        "Program:exit"(node) {
+          const lines = context.sourceCode.lines.filter(l => l.trim().length > 0 && !l.trim().startsWith("//"));
+          if (lines.length > max) {
+            context.report({ node, message: `${message} (${lines.length}/${max} lines)` });
+          }
+        },
+      };
+    },
+  };
+  return {
+    plugin: { rules: { "max-lines": rule } },
+    rule: ["error"],
+  };
+}
 
 export default [
   { ignores: ["dist/**"] },
@@ -75,6 +95,11 @@ export default [
       "comma-spacing": ["error", { before: false, after: true }],
       "@typescript-eslint/no-unnecessary-condition": ["error", { allowConstantLoopConditions: true }],
       "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-restricted-types": ["error", {
+        types: {
+          unknown: { message: "Use a specific type. Add an eslint-disable comment if unknown is intentional." },
+        },
+      }],
       "@typescript-eslint/no-inferrable-types": "error",
       "@typescript-eslint/require-await": "warn",
       "simple-import-sort/imports": ["error", {
@@ -88,6 +113,18 @@ export default [
       }],
       "simple-import-sort/exports": "error",
       "unicorn/prefer-node-protocol": "error",
+      "@typescript-eslint/consistent-type-imports": ["error", { prefer: "type-imports", fixStyle: "separate-type-imports" }],
+      // Explicit return type on switches over discriminated unions makes TS
+      // prove exhaustiveness; ESLint's syntactic `no-fallthrough` adds no
+      // safety on top of that and just forces noise (assertNever/throw/etc).
+      "no-fallthrough": "off",
+      "no-restricted-syntax": ["error", {
+        selector: "ExpressionStatement > Literal[value='use client']",
+        message: "\"use client\" is not needed — this is not a Next.js project.",
+      }, {
+        selector: "ExpressionStatement > Literal[value='use server']",
+        message: "\"use server\" is not needed — this is not a Next.js project.",
+      }],
 
       // Custom rule for @backend import
       "@typescript-eslint/no-restricted-imports": ["error", {
@@ -104,4 +141,12 @@ export default [
       }],
     },
   },
+  (() => {
+    const { plugin, rule } = createMaxLinesRule(100, "Route file must be under 100 lines. Anything beyond that should be broken down into separate component files.");
+    return {
+      files: ["src/routes/**/_route.tsx"],
+      plugins: { local: plugin },
+      rules: { "local/max-lines": rule },
+    };
+  })(),
 ];

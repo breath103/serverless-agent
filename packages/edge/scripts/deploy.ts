@@ -7,8 +7,7 @@ import { parseArgs } from "node:util";
 
 import * as cdk from "aws-cdk-lib";
 import { build } from "esbuild";
-import { frontendBucketName, loadConfig, type TssConfig } from "shared/config";
-import { validateSubdomainMap } from "shared/subdomain-validation";
+import { frontendBucketName, loadConfig } from "shared/config";
 
 import { EdgeStack } from "./lib/edge-stack.js";
 
@@ -20,17 +19,7 @@ async function main() {
 
   const config = loadConfig();
 
-  // Validate subdomainMap for cycles and invalid redirect chains
-  const validation = validateSubdomainMap(config.subdomainMap);
-  if (!validation.valid) {
-    console.error("Error: Invalid subdomainMap configuration");
-    validation.errors.forEach((e) => console.error(`  - ${e}`));
-    process.exit(1);
-  }
-
   await buildEdgeFunctions({
-    subdomainMap: config.subdomainMap,
-    domain: config.domain,
     project: config.project,
     ssmRegion: config.ssm.region,
   });
@@ -38,8 +27,6 @@ async function main() {
   const stackId = synthesizeStack({
     project: config.project,
     ssmRegion: config.ssm.region,
-    domain: config.domain,
-    hostedZoneId: config.hostedZoneId,
     frontendBucketName: frontendBucketName(config),
     githubActionsIamRole: config.edge.githubActionsIamRole
       ? { repo: config.repo }
@@ -82,7 +69,7 @@ function showHelp(): never {
   console.log(`
 Usage: ./packages/edge/scripts/deploy.ts <command> [options]
 
-Deploy or destroy the edge stack (CloudFront, Lambda@Edge, S3, Route53)
+Deploy or destroy the edge stack (CloudFront, Lambda@Edge, S3)
 
 Commands:
   deploy              Deploy the edge stack
@@ -101,8 +88,6 @@ Examples:
 }
 
 interface BuildOptions {
-  subdomainMap: TssConfig["subdomainMap"];
-  domain: string | undefined;
   project: string;
   ssmRegion: string;
 }
@@ -111,21 +96,6 @@ async function buildEdgeFunctions(opts: BuildOptions) {
   console.log("Building edge functions...");
   fs.rmSync(DIST, { recursive: true, force: true });
   fs.mkdirSync(DIST, { recursive: true });
-
-  // Build viewer-request CloudFront Function
-  await build({
-    entryPoints: [path.join(ROOT, "src/viewer-request/index.ts")],
-    bundle: true,
-    platform: "neutral",
-    target: "es2019",
-    format: "esm",
-    treeShaking: false,
-    outfile: path.join(DIST, "viewer-request/index.js"),
-    define: {
-      SUBDOMAIN_MAP_CONFIG: JSON.stringify(opts.subdomainMap),
-      DOMAIN_CONFIG: JSON.stringify(opts.domain ?? ""),
-    },
-  });
 
   // Build origin-request Lambda@Edge
   await build({
@@ -147,8 +117,6 @@ import type { EdgeStackConfig } from "./lib/edge-stack.js";
 function synthesizeStack(config: EdgeStackConfig): string {
   console.log(`  project: ${config.project}`);
   console.log(`  ssm.region: ${config.ssmRegion}`);
-  console.log(`  domain: ${config.domain ?? "(none — using generated CloudFront domain)"}`);
-  console.log(`  hostedZoneId: ${config.hostedZoneId ?? "(none)"}`);
 
   const app = new cdk.App({ outdir: path.join(ROOT, "cdk.out") });
   const stackId = EdgeStack.id({ project: config.project });
@@ -183,8 +151,6 @@ async function destroy(stackId: string) {
   console.log(`\nThis will destroy the stack: ${stackId}`);
   console.log("  - CloudFront distribution");
   console.log("  - Lambda@Edge functions");
-  console.log("  - Route53 records");
-  console.log("  - ACM certificate");
 
   const confirmed = await confirm("\nAre you sure you want to destroy?");
   if (!confirmed) {

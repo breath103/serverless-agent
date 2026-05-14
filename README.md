@@ -1,348 +1,184 @@
-# TSS Stack Template
+# Serverless Agent
 
-Type-Safe Serverless Stack for deploying full-stack TypeScript apps on AWS.
+An open-source demo showing that a full agent application — chat UI, tool-using LLM runtime, memory store, realtime browser updates — can run **entirely on AWS serverless primitives**. No managed Postgres, no custom domain, no third-party auth SaaS.
 
-> **Never call `npx` directly.** This project has scripts for everything. Use the provided scripts instead.
+A clean, minimal demo. Most of the plumbing compiles and both CI jobs are green locally — **but nothing has been deployed to AWS yet**, so the end-to-end path has not been exercised. See "State of play" below.
 
-## Live Demo
-
-- **Production (main)**: https://www.tsss.cloud/
-- **Branch preview (branch1)**: https://branch1.tsss.cloud/
-
-## Why
-
-If you want a simple web app (no SSR) on your own AWS infrastructure:
-
-- **Type-safe API calls** - Frontend imports backend types directly. No codegen, no runtime overhead.
-- **Branch previews** - Deploy `feature/auth` branch to `feature--auth.yourdomain.com`
-- **Single domain** - Backend API and frontend served from same domain. No CORS.
-- **Authentication** - [better-auth](https://better-auth.com) with stateless sessions (no database required).
-- **Your AWS account** - No vendor lock-in. You own everything.
-
-## Quick Start
-
-### 1. Setup
-
-```bash
-npm install
-./scripts/setup.ts
-```
-
-Or manually edit `tss.json`:
-
-```json
-{
-  "project": "myapp",
-  "repo": "yourorg/yourrepo",
-  "backend": { "region": "ap-northeast-2" },
-  "ssm": { "region": "ap-northeast-2" },
-  "domain": "myapp.com",
-  "hostedZoneId": "Z1234567890"
-}
-```
-
-- `hostedZoneId` - from Route53. Create a hosted zone for your domain first.
-- `repo` - your GitHub repo (org/repo format). Used for CI/CD setup.
-
-### 2. Deploy
-
-```bash
-# Edge (CloudFront + Lambda@Edge) - run once
-./packages/edge/scripts/deploy.ts deploy
-
-# Backend
-./packages/backend/scripts/deploy.ts --name=main
-
-# Frontend
-./packages/frontend/scripts/deploy.ts --name=main
-```
-
-### 3. Environment Variables
-
-Define env vars in `src/env.d.ts`:
-
-```typescript
-// packages/backend/src/env.d.ts
-declare namespace NodeJS {
-  interface ProcessEnv {
-    DATABASE_URL: string;           // required
-    OPTIONAL_KEY: string | undefined; // optional
-  }
-}
-```
-
-**Local dev**: Create `.env` in each package (gitignored):
-
-```bash
-# packages/backend/.env
-DATABASE_URL=postgres://localhost/myapp
-```
-
-**CI/CD**: Set in `.github/workflows/deploy.yml`:
-
-```yaml
-- name: Deploy backend
-  env:
-    DATABASE_URL: "postgres://prod/myapp"
-  run: ./packages/backend/scripts/deploy.ts --name=${{ github.ref_name }}
-```
-
-### 4. Authentication (Google OAuth)
-
-Add to `packages/backend/.env`:
-
-```bash
-GOOGLE_CLIENT_ID=your_client_id
-GOOGLE_CLIENT_SECRET=your_client_secret
-BETTER_AUTH_SECRET=random_32_char_secret
-```
-
-Set up Google OAuth at [Google Cloud Console](https://console.cloud.google.com/apis/credentials) with callback URL: `http://localhost:3000/api/auth/callback/google`
-
-### 5. Dev
-
-```bash
-./scripts/dev.ts                # foreground, streams logs (Ctrl-C to stop)
-./scripts/dev.ts start          # detach to background, return once ready
-./scripts/dev.ts status         # show ready/starting + per-process pids
-./scripts/dev.ts stop           # kill the background dev server
-```
-
-Runs edge proxy on `:3000`, backend on `:3001`, frontend on `:3002`.
-
-`start` writes `.dev-status.json` (gitignored) and exits once all servers are ready (30s timeout). Any subprocess crash tears the whole tree down — no orphans — and a detached reaper SIGKILLs the process group 2s after the foreground dies, so even SIGKILL of the foreground is cleaned up.
-
-## Multiple Worktrees
-
-To work on several branches at once without dev/auth/e2e collisions, use git worktrees plus a per-checkout `tss.override.json`.
-
-```bash
-# From the main checkout:
-git worktree add ../myapp-2 some-branch
-cd ../myapp-2
-npm install
-```
-
-Then in the new worktree, create `tss.override.json` (gitignored) with a unique `dev.worktree` and dev ports:
-
-```json
-{
-  "dev": { "worktree": "2" },
-  "edge":     { "devPort": 3010 },
-  "backend":  { "devPort": 3011 },
-  "frontend": { "devPort": 3012 }
-}
-```
-
-`dev.worktree` is the per-checkout id. Together with `project` it namespaces:
-
-- **auth cookies** — `BETTER_AUTH_COOKIE_PREFIX=${project}-${worktree}`, so two localhost instances don't share a session cookie.
-- **e2e Chrome** — CDP port, profile dir (`.tmp/e2e-chrome-profile-${project}-${worktree}`), and status file (`.e2e-status-${project}-${worktree}.json`) are all per-namespace, so `./scripts/e2e.ts start` in two worktrees launches two independent browsers.
-
-## E2E Testing
-
-The e2e tool manages a headless Chrome instance via Chrome DevTools Protocol for browser automation.
-
-### Quick Start
-
-```bash
-./scripts/dev.ts start     # Start dev servers (background)
-./scripts/e2e.ts start     # Start headless Chrome
-./scripts/e2e.ts navigate /
-./scripts/e2e.ts screenshot
-./scripts/e2e.ts stop      # Stop Chrome when done
-./scripts/dev.ts stop      # Stop dev servers when done
-```
-
-### Commands
-
-| Command | Description |
-|---------|-------------|
-| `start` | Start headless Chrome |
-| `stop` | Stop headless Chrome |
-| `navigate <path>` | Navigate to URL (relative or absolute) |
-| `screenshot [out-path]` | Take screenshot (default: `.tmp/screenshot-{timestamp}.png`) |
-| `run-js <expression>` | Execute JavaScript in page |
-| `click <selector>` | Click element |
-| `type <selector> <text>` | Type into input field |
-| `wait <selector>` | Wait for element (30s timeout) |
-| `set-viewport <width> <height>` | Set viewport size |
-| `page-text` | Print page body text |
-
-### Examples
-
-```bash
-./scripts/e2e.ts navigate /api/health
-./scripts/e2e.ts click "button.login"
-./scripts/e2e.ts type "input[name=email]" "user@example.com"
-./scripts/e2e.ts wait "div.dashboard"
-./scripts/e2e.ts run-js "document.title"
-./scripts/e2e.ts screenshot my-screenshot.png
-```
-
-## Type-Safe API
-
-Define routes with full type inference:
-
-```typescript
-// packages/backend/src/api.ts
-import { z } from "zod";
-import { route, routes } from "./lib/route.js";
-
-export const api = routes(
-  route("/api/users/:id", "GET", {
-    query: { include: z.string().optional() },
-    handler: ({ params, query }) => ({
-      id: params.id,  // inferred from path
-      include: query.include,
-    }),
-  }),
-
-  route("/api/users", "POST", {
-    body: { name: z.string(), email: z.string().email() },
-    handler: ({ body }) => ({ created: body.name }),
-  }),
-);
-```
-
-Frontend gets types automatically:
-
-```typescript
-// packages/frontend/src/lib/api-client.ts
-import type { ApiRoutes } from "backend/api";
-
-const api = new ApiClient<ApiRoutes>();
-
-// Fully typed - params, query, body, response
-const user = await api.fetch("/api/users/:id", "GET", {
-  params: { id: "123" },
-  query: { include: "posts" },
-});
-```
+---
 
 ## Architecture
 
 ```
-                    │ Request
-                    ▼
-            ┌──────────────┐
-            │  CloudFront  │
-            └──────┬───────┘
-                   │
-                   ▼
-          ┌─────────────────┐
-          │ viewer-request  │  CloudFront Function
-          │                 │
-          │ Extracts branch │
-          │ from subdomain  │
-          └────────┬────────┘
-                   │
-                   ▼
-          ┌─────────────────┐
-          │ origin-request  │  Lambda@Edge
-          │                 │
-          │ /api/* → Lambda │
-          │ /*     → S3     │
-          └────────┬────────┘
-                   │
-        ┌──────────┴──────────┐
-        │                     │
-        ▼                     ▼
-┌───────────────┐     ┌───────────────┐
-│    Lambda     │     │      S3       │
-│ (Backend API) │     │  /{branch}/*  │
-└───────────────┘     └───────────────┘
+Browser
+  │
+  ▼
+CloudFront (default *.cloudfront.net host)
+  │    ├─ S3  ← static React SPA
+  │    └─ Lambda@Edge (origin-request)
+  │         │
+  │         └─ /api/* → Backend Function URL (looked up in SSM)
+  │                      │
+  │                      ▼
+  │                   Hono on Lambda
+  │                      │
+  │    ┌─────────────────┼──────────────────┐
+  │    ▼                 ▼                  ▼
+  │  DynamoDB      S3 (agent files)   AWS IoT Core (MQTT)
+  │  (6 tables)                        │
+  └──── realtime row updates ◄─────────┘
 ```
 
-### Routing
+- **Edge** — single CloudFront distribution, default `*.cloudfront.net` cert. Lambda@Edge at origin-request reads the backend URL from SSM and rewrites `/api/*` traffic to it. Everything else is served from S3 (SPA index.html fallback for unknown paths).
+- **Backend** — Node.js 24 Lambda running Hono (`packages/backend/src/lambda-api/`).
+- **Agent runtime** — in `packages/backend/src/agent-runtime/`. One tool (`executeCode`) that runs TypeScript in a sandbox with typed skill bindings: `memory`, `webSearch`, `audio`, `url`, `llm`. Skill calls are traced via a Proxy for UI rendering.
+- **Storage** — every entity is its own DynamoDB table declared in the CDK stack (`packages/backend/scripts/lib/backend-stack.ts`). Pay-per-request. Attribute naming is snake_case to match the TS row shapes in `packages/backend/src/types/database.ts`.
+- **Auth** — username + password; scrypt hashing; HTTP-only session cookie (`sa_session`); sessions table with DynamoDB TTL. See `packages/backend/src/auth/`.
 
-1. **viewer-request** extracts subdomain and applies `subdomainMap`:
-   - `myapp.com` → `main` (mapped from `""`)
-   - `www.myapp.com` → `main` (mapped from `"www"`)
-   - `feature--auth.myapp.com` → `feature--auth` (used as-is)
-   - `main.myapp.com` → 404 (mapped to `null` = blocked)
+---
 
-2. **origin-request** routes by path:
-   - `/api/*` → Backend Lambda (URL from SSM)
-   - `/*` → S3 (`/{branch}/...`)
-
-### SSM Parameter Store
-
-Backend URLs are stored in SSM so Lambda@Edge can route dynamically:
+## Repo layout
 
 ```
-/{project}/backend/{branch} → Lambda Function URL
+packages/
+  backend/
+    scripts/lib/backend-stack.ts     ← CDK: Lambda, S3, DynamoDB tables
+    src/
+      auth/                          ← scrypt + cookie sessions (replaces better-auth)
+      users/                         ← users-repository on DynamoDB
+      profiles/                      ← profiles-repository on DynamoDB
+      memories/                      ← memories-repository on DynamoDB
+      chat-sessions/                 ← chat sessions + messages on DynamoDB
+      agent-runtime/                 ← LLM loop, sandbox, skill runtime
+        skill-runtimes/              ← the six live skills
+      lambda-api/                    ← Hono routes
+      lib/
+        ddb.ts                       ← DocumentClient singleton + table-name env lookup
+        realtime-events.ts           ← MQTT event shapes (shared with frontend)
+      types/database.ts              ← plain TS row types (no Kysely)
+  frontend/                          ← Vite + React + TanStack Router
+  edge/
+    scripts/lib/edge-stack.ts        ← CDK: CloudFront + Lambda@Edge + S3
+    src/origin-request/              ← routes /api/* → backend URL
+  shared/                            ← config loader, SSM naming
+scripts/
+  dev.ts                             ← start/stop dev servers
+  setup.ts                           ← interactive tss.json bootstrapper
 ```
 
-When you deploy backend for `feature/auth`, it stores:
-```
-/myapp/backend/feature--auth → https://xxx.lambda-url.ap-northeast-2.on.aws/
-```
+---
 
-Lambda@Edge reads this at runtime (cached 60s) to route API requests.
+## State of play
 
-## CI/CD
+### Done (committed, `main` @ `5cb1f32`)
 
-Automatic deployment on push:
-- Push to any branch → deploys backend + frontend for that branch
-- Edge must be deployed manually (`./packages/edge/scripts/deploy.ts deploy`)
+- DNS / Route53 / ACM / custom-domain wiring **removed** from both edge and backend stacks.
+- **Six DynamoDB tables** declared in `packages/backend/scripts/lib/backend-stack.ts` (users, sessions, profiles, memories, chat-sessions, chat-messages). Pay-per-request, point-in-time recovery on, sessions table has TTL on `expires_at_epoch`.
+- **All repos rewritten** to use the AWS SDK v3 DocumentClient via `src/lib/ddb.ts`. Table names come from `TABLE_*` env vars injected by the CDK stack.
+- **Auth replaced.** `POST /api/auth/sign-{in,up,out}` + `GET /api/auth/session`. Cookie: `sa_session`, HttpOnly, SameSite=Lax, Secure.
+- **Frontend auth** rewritten: `packages/frontend/src/lib/auth-client.ts` is a thin fetch wrapper; `AuthContext` re-fetches session on mount. Login page has both sign-in and sign-up modes.
+- **Cut features**: ontology, billable-usage, radar, Google/Slack/Telegram skills, user-skills OAuth, Supabase CLI scripts, seed-persona, SQL migrations, telegram webhook tunnel, landing-page marketing copy left as-is for now.
+- `.env.*` files **deleted** (they contained live API keys for Anthropic, OpenAI, Google, Tavily, PostHog). Added `.env.sample` templates.
+- CI workflow (`.github/workflows/deploy.yml`) reduced to a check-only job on `ubuntu-latest` — no deploy step, no Telegram notify.
+- **Both CI jobs green locally**: `backend build-types + lint + test` and `frontend build-types + lint + test`.
 
-### Setup
+### Not yet verified / not done
 
-1. Run bootstrap to create IAM role for GitHub Actions:
+These all compile and the types line up, but nobody has actually run them against AWS yet:
+
+- **CDK synth**. I haven't run `cdk synth` or `cdk deploy` for either stack. Regional / cross-region / Lambda@Edge quirks could surface at deploy time.
+- **Real DynamoDB I/O.** The repo layer has never been exercised. BatchGet chunking (100-key cap) and the "scan all then sort/filter in memory" pattern in `memories` is fine for a demo but will need pagination tweaks for anything real.
+- **Cross-region backend URL lookup.** The edge stack's SSM policy allows reading `/${project}/backend/*`, and origin-request caches the lookup for 60s. Not tested end-to-end.
+- **Agent runtime** still calls Anthropic + Tavily + AWS IoT. None of these are tested with real keys on this branch. `AGENT_MQTT_*` env vars are still required for the handler to start.
+- **Dev server** (`./scripts/dev.ts start`) has not been run on this repo since the rewrite. Likely broken without a stubbed `.env.development` for backend + frontend.
+- **No DynamoDB Local fallback.** The repos hit real AWS. For local dev you'll either need AWS creds pointed at real tables, or wire in DynamoDB Local + a custom endpoint in `src/lib/ddb.ts`.
+- **Frontend routes for deleted features.** I removed `/dashboard/radars`, `/dashboard/settings/usage`, `/dashboard/settings/skills` from the sidebar and route tree, but a few supporting components / helpers might still be in the tree unused. Run knip on the frontend if this matters.
+- **No integration tests.** Existing unit tests are placeholders. `src/__tests__/agent.test.ts` is entirely TODO stubs from the old codebase.
+- **`.claude/` skills + rules** still reference the previous Supabase flow in a couple places. Non-blocking; update as you go.
+- **`TSS_README.md`, `opencode.json`** kept as-is from the template. Delete or update if irrelevant.
+- **Tests have 2 lint warnings** (pre-existing): `memory-content-editor` tailwind class, `react-hook-form` `watch()` in `ProfilePageLoaded`. Not errors.
+
+---
+
+## Getting started
+
+### Prerequisites
+
+- Node 24 (see `.nvmrc`)
+- AWS credentials (for DDB, IoT, S3, Lambda, CloudFront, SSM)
+- API keys: Anthropic (required), Tavily (required for web-search), OpenAI (for audio)
+
+### One-time project config
 
 ```bash
-./packages/edge/scripts/deploy.ts deploy
+cp .env.sample .env
+cp packages/backend/.env.sample packages/backend/.env.development
+cp packages/frontend/.env.sample packages/frontend/.env.development
+# Fill in keys in each
 ```
 
-This creates an OIDC identity provider and IAM role in AWS. Copy the `RoleArn` from the output.
+Edit `tss.json` → change `project` and `repo` to your values.
 
-2. Add to GitHub repo (Settings → Secrets and variables → Actions):
-   - Secret: `AWS_ROLE_ARN` = the role ARN from step 1
+### Local development
 
-## Project Structure
+All scripts are executable — no `npm run` needed.
 
-```
-├── tss.json              # Config (schema: tss.schema.json)
-├── scripts/
-│   ├── dev.ts            # Dev server orchestrator
-│   ├── e2e.ts            # E2E testing (headless Chrome)
-│   ├── lint              # Lint all packages
-│   └── setup.ts          # Interactive project setup
-├── packages/
-│   ├── backend/          # Hono API → Lambda
-│   ├── frontend/         # Vite + React → S3
-│   ├── edge/             # CloudFront + Lambda@Edge
-│   └── shared/           # Shared utilities
+```bash
+npm install
+./scripts/dev.ts start        # backend + frontend + edge proxy in the background
+./scripts/dev.ts status       # current state + edge proxy URL
+./scripts/dev.ts stop
 ```
 
-## Branch Name Sanitization
+Access the app only through the edge-proxy URL printed by `start`.
 
-Git branch names are sanitized to be subdomain-safe (RFC 1123):
+**Caveat**: the dev backend talks to real DynamoDB tables named by your `.env.development`'s `TABLE_*` vars. You'll want a separate `-dev` suffix on those, or swap in DynamoDB Local (see "Known TODOs" below).
 
-| Branch | Subdomain |
-|--------|-----------|
-| `feature/auth` | `feature--auth` |
-| `Feature_Branch` | `feature-branch` |
-| `v1.2.3` | `v1-2-3` |
+### CI parity (run before committing)
 
-Rules: lowercase, `/` → `--`, non-alphanumeric → `-`, max 63 chars, no leading/trailing hyphens.
+```bash
+./packages/backend/scripts/build-types.ts \
+  && ./packages/backend/scripts/lint.ts \
+  && npm test -w backend
 
-## AWS Resources
+./packages/backend/scripts/build-types.ts \
+  && ./packages/frontend/scripts/build-types.ts \
+  && ./packages/frontend/scripts/lint.ts \
+  && npm test -w frontend
+```
 
-### Per backend deployment (`{project}-backend-{branch}`)
-- Lambda Function + Alias + Function URL
-- IAM Role
-- SSM Parameter (`/{project}/backend/{branch}`)
+**Never run `tsc` or `npx tsc` directly** — always use the `build-types.ts` scripts. See `CLAUDE.md` for why.
 
-### Per frontend deployment
-- S3 objects under `/{branch}/*`
+### Deploying
 
-### Edge deployment (`{project}-edge`)
-- CloudFront Distribution
-- Lambda@Edge Function (us-east-1)
-- ACM Certificate (wildcard)
-- Route53 A Records (root + wildcard)
-- S3 Bucket (frontend assets)
+```bash
+./packages/edge/scripts/deploy.ts deploy              # CloudFront + Lambda@Edge + S3
+./packages/backend/scripts/deploy.ts --env=production # backend Lambda + DDB tables + worker
+./packages/frontend/scripts/deploy.ts --env=production
+```
 
-All resources tagged with `project` and `environment` (branch name).
+Deploy order matters the first time: edge creates the S3 bucket the frontend deploys into, and backend writes its Function URL into SSM where the edge Lambda@Edge reads from.
+
+---
+
+## Known TODOs (good first commits)
+
+1. **Do a real CDK synth + deploy.** Expect to hit one or two permission / region issues (Lambda@Edge is locked to `us-east-1`; backend can be anywhere).
+2. **Seed a first user.** There's no "create admin" path — just open the app and use the sign-up form.
+3. **Delete stale `.claude/` skills** that reference Supabase flows, or port them to the new DynamoDB setup.
+4. **Write at least one integration test** that spins up DynamoDB Local and exercises `usersRepo.create` → `signIn` → `signOut`. The unit tests in place today are TODO stubs from the old project.
+5. **Consider swapping AWS IoT for a simpler realtime** (Server-Sent Events from Lambda, or polling) if you want the demo to be truly zero-extra-setup. IoT works but the cert + MQTT wiring is heavy for a demo.
+
+---
+
+## Useful pointers
+
+- **Adding a new DynamoDB table** — declare it in `packages/backend/scripts/lib/backend-stack.ts`, add to `allTables` and `tableEnv`, add a name getter to `src/lib/ddb.ts`, add the row type to `src/types/database.ts`, write a repo next to the existing ones.
+- **Adding a new route** — `src/lambda-api/routes/<name>.ts`, export `routes`, then spread into `src/lambda-api/routes/index.ts`. Use `c.get("requireUser")()` to enforce auth.
+- **Adding a new skill** — `src/agent-runtime/skill-runtimes/<name>.ts` using `defineSkillRuntime`, register in `skill-runtimes/index.ts` and `skills/builtins.ts`, then **run `./packages/backend/scripts/generate-declarations.ts`** — the agent sees skills via the generated `.d.ts`, typecheck alone won't catch a stale declaration.
+- **Frontend talks to backend types directly** via the `@backend/*` path alias. Cross-package type breakage only surfaces in the frontend typecheck — always run both.
+
+---
+
+## License
+
+MIT (intent — add a `LICENSE` file when you're ready to make the repo public).

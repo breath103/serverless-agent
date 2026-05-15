@@ -129,6 +129,21 @@ const tables: TableSpec[] = [
       ],
     },
   },
+  {
+    name: `${TABLE_PREFIX}-user-skills`,
+    input: {
+      TableName: `${TABLE_PREFIX}-user-skills`,
+      BillingMode: "PAY_PER_REQUEST",
+      AttributeDefinitions: [
+        { AttributeName: "user_id", AttributeType: "S" },
+        { AttributeName: "id", AttributeType: "S" },
+      ],
+      KeySchema: [
+        { AttributeName: "user_id", KeyType: "HASH" },
+        { AttributeName: "id", KeyType: "RANGE" },
+      ],
+    },
+  },
 ];
 
 function dockerPs(filter: string): string {

@@ -5,6 +5,7 @@ import type {
   ChatSessionRow,
   MemoryRow,
   ProfileRow,
+  UserSkillRow,
 } from "../types/database.js";
 import type { JsonValue } from "../types/json.js";
 
@@ -54,6 +55,7 @@ export type RealtimeTableRowMap = {
   chat_sessions: ChatSessionRow;
   chat_session_messages: ChatSessionMessageRow;
   profiles: ProfileRow;
+  user_skills: UserSkillRow;
 };
 
 /** @public — required from frontend */

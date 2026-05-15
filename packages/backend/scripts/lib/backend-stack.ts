@@ -103,6 +103,14 @@ export class BackendStack extends cdk.Stack {
       sortKey: { name: "created_at_id", type: dynamodb.AttributeType.STRING },
     });
 
+    // user_skills: (user_id, id) → installed-skill row (OAuth tokens + config)
+    const userSkillsTable = new dynamodb.Table(this, "UserSkillsTable", {
+      ...tableDefaults,
+      tableName: `${id}-user-skills`,
+      partitionKey: { name: "user_id", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "id", type: dynamodb.AttributeType.STRING },
+    });
+
     const allTables = [
       usersTable,
       sessionsTable,
@@ -110,6 +118,7 @@ export class BackendStack extends cdk.Stack {
       memoriesTable,
       chatSessionsTable,
       chatMessagesTable,
+      userSkillsTable,
     ];
 
     // ── S3 Bucket for Agent State ─────────────────────────────────────

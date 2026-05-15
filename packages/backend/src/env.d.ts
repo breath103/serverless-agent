@@ -4,6 +4,11 @@ declare namespace NodeJS {
     ANTHROPIC_API_KEY: string;
     TAVILY_API_KEY: string;
 
+    // Google OAuth (Cloud Console → APIs & Services → Credentials → OAuth client of type Web).
+    // Authorized redirect URI in dev: http://localhost:<edge.devPort>/api/skills/oauth/callback
+    GOOGLE_CLIENT_ID: string;
+    GOOGLE_CLIENT_SECRET: string;
+
     // Agent state storage (S3)
     AGENT_STORAGE_BUCKET: string; // @cdk-injected
 

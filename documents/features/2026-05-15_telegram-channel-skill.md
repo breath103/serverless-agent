@@ -130,7 +130,7 @@ await dispatchAssistantTextToChannels({ userId, sessionId, text: block.text });
 
 1. Loads `user_skills` rows for the user (already cached for the turn? — no, the rows are loaded in `buildSkills` which has its own scope. A second read per turn is fine — a few items, single Query).
 2. Filters to rows where `data.skill_id === "telegram"` AND `data.config.chat_session_id === sessionId`.
-3. For each match, POSTs to `https://api.telegram.org/bot<token>/sendMessage` with `{ chat_id: telegram_chat_id, text, parse_mode: "MarkdownV2" }`.
+3. For each match, POSTs to `https://api.telegram.org/bot<token>/sendMessage` with `{ chat_id: telegram_chat_id, text, parse_mode: "HTML" }`, where `text` is the agent's Markdown converted to Telegram's tiny HTML subset (`<b>`, `<i>`, `<code>`, `<pre>`, `<a href>`). On a parse-error 400 the helper retries once with the raw text and no `parse_mode` so delivery never drops.
 4. Per-row failures are logged + swallowed (a revoked bot token or a deleted Telegram chat must not crash the turn or affect web-UI delivery).
 
 ### Why only `text` blocks
@@ -141,9 +141,18 @@ await dispatchAssistantTextToChannels({ userId, sessionId, text: block.text });
 
 User messages (role=user) are written before the agent loop starts in `runChatInBackground`. The outbound hook is in `persistAssistantBlock`, which only runs on assistant content. So inbound→outbound→inbound recursion can't happen by construction.
 
-### MarkdownV2 escaping
+### Markdown → Telegram HTML
 
-Telegram's MarkdownV2 is picky — `_`, `*`, `[`, `]`, `(`, `)`, `~`, etc. must be escaped except inside their formatting markers. Cheapest correct approach: send `parse_mode: "MarkdownV2"` with a permissive escape function that escapes everything Telegram doesn't accept literally, except the markers we want to honour. If escaping turns out flaky for a release, fall back to `parse_mode: undefined` (plain text) and lose formatting — still ships the content correctly.
+The agent emits Markdown; Telegram renders either MarkdownV2 (finicky — every literal `.`, `!`, `-`, `(`, `)`, etc. must be escaped outside markers) or a small HTML subset. We picked HTML because it's a closed grammar that's easy to generate correctly:
+
+- HTML-escape the input (`&`, `<`, `>`) first, so any LLM-emitted `<tag>` shows as text.
+- Convert `**bold**` / `__bold__` → `<b>`, `*italic*` / `_italic_` → `<i>`, `~~s~~` → `<s>`, `` `code` `` → `<code>`, ` ```code``` ` → `<pre>`, `[label](url)` → `<a href="url">label</a>`.
+- Headers (`# x`) collapse to `<b>x</b>` (Telegram has no header tag).
+- Bullets `- item` become `• item` (Telegram has no list tag).
+- Tables (`| a | b |`) flatten to `a · b` (Telegram has no table support at all).
+- Horizontal rules (`---`) become `—`.
+
+Fallback: if Telegram still rejects (some pathological combination), the helper retries once without `parse_mode` — delivery survives, formatting is lost for that message only.
 
 ---
 
@@ -247,7 +256,7 @@ Mocking discipline: only the Telegram Bot API is mocked. Webhook routing, messag
 |---|---|---|
 | `packages/backend/src/skills/telegram.ts` | ~110 | `defineSkill` with `install.type === "telegram"`, plus `getMe` / `setWebhook` / `deleteWebhook` HTTP helpers + the config schema |
 | `packages/backend/src/lambda-api/routes/telegram-webhook.ts` | ~120 | Inbound webhook handler + Telegram Update zod schema |
-| `packages/backend/src/channels/telegram-dispatcher.ts` | ~70 | `dispatchAssistantTextToChannels(...)`, MarkdownV2 escape, `sendMessage` HTTP call |
+| `packages/backend/src/channels/telegram-dispatcher.ts` | ~45 | `createTelegramDispatcher(...)` (lazy per-turn closure), per-target `sendMessage` |
 | `packages/backend/scripts/e2e_telegram.ts` | ~180 | E2E harness (with in-process mock Telegram server) |
 | `packages/backend/scripts/register_telegram_webhook.ts` | ~25 | Dev helper for manual webhook registration over a tunnel |
 | `packages/frontend/src/routes/app/dashboard/settings/skills/TelegramInstallDialog.tsx` | ~80 | Modal that prompts for bot token, calls `/api/skills/install/telegram` |
@@ -278,7 +287,7 @@ Mocking discipline: only the Telegram Bot API is mocked. Webhook routing, messag
 2. **Local dev requires a tunnel.** The fallback is to skip the auto-`setWebhook` step in development and let the user either run the manual helper script + ngrok, or just rely on `e2e_telegram.ts` which simulates Telegram in-process. Acceptable trade-off.
 3. **Group chats and multi-bind.** A user could (today, after install) accidentally invite the bot into a group chat — first inbound would bind the row to that group. Mitigation: in step 4d above, `if (telegram_chat_id == null)` we should also assert `update.chat.type === "private"` and reject otherwise.
 4. **One bot token, one row, one chat.** A user who wants two bound conversations needs two bot tokens. Out of scope; we'll know we need to lift this when someone actually asks for it.
-5. **MarkdownV2 escaping fragility.** A malformed escape causes Telegram to 400 the whole send, dropping the assistant message silently. Mitigation: catch the 400 and retry once with `parse_mode: undefined`. Lose formatting, keep delivery.
+5. **HTML rendering fragility.** A pathological tag combination causes Telegram to 400 the whole send. Mitigation: catch the 400 and retry once with `parse_mode: undefined`. Lose formatting on that message, keep delivery.
 6. **`refreshAllUserSkills` worker.** Today it iterates all rows and calls `handler.install.refreshConfig`. Telegram has no refresh — solution: only call `refreshConfig` if the install variant has it (i.e., if `install.type === "oauth2"`). Already true by typecheck since `refreshConfig` is on oauth2 only — confirm at the `refreshAndPersist` call site filters by install.type. (`packages/backend/src/skills/refresh.ts` — re-check during implementation.)
 7. **MQTT / realtime delivery on web-UI when reply comes from Telegram.** When the agent writes the assistant text row, `publishRealtimeEvent` fires (already wired in `insertPart`). The web user (if they have the chat open) sees the assistant reply land in real time — they just can't reply unless we open the channel-skill chat to web replies too (yes, we should; it's free and harmless).
 8. **Rate limits.** Telegram caps outbound to 30 msgs/sec per bot. Demo scale won't hit this. Log and ignore for now.

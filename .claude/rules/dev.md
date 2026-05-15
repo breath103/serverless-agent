@@ -61,6 +61,40 @@ To call backend API endpoints as the authenticated user during local development
 curl -H "X-Dev-Role: user" http://localhost:<edge.devPort>/api/channels
 ```
 
+## Local Telegram Testing (real BotFather bot)
+
+Telegram won't deliver webhooks to `localhost` — needs a public HTTPS URL. The install route auto-skips `setWebhook` in dev *unless* you set `EDGE_PUBLIC_URL`. With a free zero-signup tunnel via cloudflared, the full inbound + outbound round-trip works against a real bot.
+
+```bash
+# 1. Start a tunnel pointing at the edge proxy. Prints the public URL.
+#    cloudflared is preinstalled via Homebrew. No login or account needed for `--url`.
+cloudflared tunnel --url http://localhost:6001 --no-autoupdate
+#    → https://<random-words>.trycloudflare.com
+
+# 2. Add the URL to packages/backend/.env.development (must be EDGE_PUBLIC_URL — see env.d.ts):
+echo 'EDGE_PUBLIC_URL="https://<random-words>.trycloudflare.com"' >> packages/backend/.env.development
+
+# 3. Restart dev so the backend picks up the env (it reads at startup, not per-request):
+./scripts/dev.ts stop && ./scripts/dev.ts start
+
+# 4. Verify the tunnel reaches the local backend:
+curl https://<random-words>.trycloudflare.com/api/health
+#    → {"status":"ok",...}
+
+# 5. Create a bot via @BotFather on Telegram (/newbot, give it a name + @handle),
+#    then paste the token into Settings → Skills → Connect Telegram in the web UI.
+#    The install route registers setWebhook against the tunnel URL.
+
+# 6. Message the bot on Telegram. The webhook hits the backend through the tunnel
+#    and a chat appears in the web sidebar; the agent's reply lands back in Telegram.
+
+# 7. Disconnect via the UI when done — that calls deleteWebhook and removes the row.
+```
+
+Caveats:
+- The cloudflared "quick tunnel" URL is ephemeral. If you stop and restart cloudflared you get a new URL — update `EDGE_PUBLIC_URL` and restart dev again, otherwise Telegram is still pointing at a dead tunnel.
+- A bot token is a secret. Don't commit it. The token lives only inside DynamoDB (`user-skills` row), never in env files or git.
+
 ## E2E Browser Testing
 
 Use the headless Chrome CLI to verify UI changes without touching the user's browser. The E2E instance has its own lifecycle, independent of the dev server.

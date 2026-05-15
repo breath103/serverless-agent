@@ -97,7 +97,7 @@ async function main(): Promise<void> {
     const me = await telegramGetMe("test-token");
     assert(me.bot_username === "mock_test_bot", "getMe returned wrong username");
     await telegramSetWebhook("test-token", "https://example.invalid/wh", "secret-xyz");
-    await telegramSendMessage("test-token", "12345", "hello *world*");
+    await telegramSendMessage("test-token", "12345", "**bold** and `code` and a [link](https://example.com)\n- bullet one\n- bullet two");
     await telegramDeleteWebhook("test-token");
 
     const methodsSeen = mock.calls.map((c) => c.method);
@@ -108,8 +108,12 @@ async function main(): Promise<void> {
     const setHook = mock.calls.find((c) => c.method === "setWebhook");
     assert(setHook?.body.secret_token === "secret-xyz", "setWebhook didn't pass secret_token");
     const sent = mock.calls.find((c) => c.method === "sendMessage");
-    assert(sent?.body.text === "hello *world*", `sendMessage didn't pass through plain text: ${String(sent?.body.text)}`);
-    assert(sent.body.parse_mode === undefined, `sendMessage should not request parse_mode, got ${String(sent.body.parse_mode)}`);
+    assert(sent?.body.parse_mode === "HTML", `sendMessage should request HTML parse_mode, got ${String(sent?.body.parse_mode)}`);
+    const sentText = sent.body.text as string;
+    assert(sentText.includes("<b>bold</b>"), `sendMessage didn't convert bold: ${sentText}`);
+    assert(sentText.includes("<code>code</code>"), `sendMessage didn't convert inline code: ${sentText}`);
+    assert(sentText.includes("<a href=\"https://example.com\">link</a>"), `sendMessage didn't convert link: ${sentText}`);
+    assert(sentText.includes("• bullet one"), `sendMessage didn't convert bullets: ${sentText}`);
 
     console.log("→ sign in as admin");
     const cookie = await loginAsUser(BASE, "admin", "admin");

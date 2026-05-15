@@ -158,6 +158,13 @@ async function persistAssistantBlock(opts: {
           },
         },
       });
+      // Progress hint to channel users: the LLM-emitted `description` is the
+      // same one-line label shown in the web UI's tool-call header. Mirror it
+      // to Telegram so the user sees "...working on X..." instead of silence
+      // between their question and the final answer.
+      if (block.input.description.length > 0) {
+        await sendToTelegram(`_${block.input.description}…_`);
+      }
       break;
     }
   }

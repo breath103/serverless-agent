@@ -1,9 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { publishRealtimeEvent } from "../lib/realtime-publish.js";
 import type { InstallableSkillConfig } from "../skills/index.js";
-import { skillHandlers } from "../skills/index.js";
+import { refreshAndPersist } from "../skills/refresh.js";
 import { userSkillsRepo } from "../skills/user-skills-repository.js";
 import type { SkillRuntimeInstance } from "./skill-runtimes/define.js";
 import { loadSkill } from "./skill-runtimes/index.js";
@@ -63,28 +62,25 @@ export async function buildSkills(opts: {
   });
 
   // ── User-installed ────────────────────────────────────────────────────
-  // Each row → refresh-on-load → loadSkill → bind by camelSkillId.
-  // Since we dedupe on (user_id, skill_id) at the OAuth callback, there's
-  // at most one row per skill per user — so a plain camelSkillId binding
-  // is unambiguous.
+  // Refresh-on-load per row → bind by camelSkillId. Since we dedupe on
+  // (user_id, skill_id) at the OAuth callback, there's at most one row per
+  // skill per user, so a plain camelSkillId binding is unambiguous.
+  //
+  // Per-row failures (revoked grant, expired refresh token, provider 5xx)
+  // are logged and the row is skipped — the rest of the agent (memory,
+  // webSearch, other healthy skills) stays functional for that turn.
   const rows = await userSkillsRepo.listForUser(opts.userId);
   for (const row of rows) {
-    // `row.data.skill_id` is `InstallableSkillId` and every installable
-    // handler is statically oauth2 — no runtime type-check needed.
-    const handler = skillHandlers[row.data.skill_id];
-    const refreshed = await handler.install.refreshConfig(row.data.config);
-    if (refreshed.expiresAt !== row.data.config.expiresAt) {
-      const updated = await userSkillsRepo.updateData(
-        opts.userId,
-        row.id,
-        { skill_id: row.data.skill_id, config: refreshed } as InstallableSkillConfig,
+    let config;
+    try {
+      ({ config } = await refreshAndPersist(row));
+    } catch (err) {
+      console.error(
+        `[buildSkills] skipping ${row.data.skill_id} for user=${opts.userId}: ${err instanceof Error ? err.message : String(err)}`,
       );
-      if (updated) {
-        await publishRealtimeEvent(opts.userId, { type: "entity_update", table: "user_skills", op: "upsert", row: updated });
-      }
+      continue;
     }
-
-    const instance = loadSkill(row.id, { skill_id: row.data.skill_id, config: refreshed } as InstallableSkillConfig);
+    const instance = loadSkill(row.id, { skill_id: row.data.skill_id, config } as InstallableSkillConfig);
     const variableName = toCamelCase(instance.skillId);
     const nsName = toPascalCase(instance.skillId);
     bindings[variableName] = traceInstance(instance, opts.skillCalls);

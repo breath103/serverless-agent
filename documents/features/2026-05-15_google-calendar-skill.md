@@ -49,11 +49,31 @@ Pensieve already implements Google Calendar (plus Mail/Drive/Sheets) on Postgres
 
 This is one extra `if`-comparison per row per chat turn — negligible cost, and means tokens never expire mid-turn.
 
+**Periodic background refresh via EventBridge cron.** Refresh-on-load alone covers chat usage but leaves a few gaps:
+
+- A user installs the skill, doesn't chat for >1 hour, then chats — the first turn refreshes successfully (refresh token still valid), so this works.
+- A user installs and walks away for 7 days. If the OAuth client is in "Testing" status, the refresh token itself expires after 7 days of inactivity → next refresh fails with `invalid_grant` and the user has to reconnect. **Cron doesn't prevent this** (only publishing the OAuth app to "In production" status does), but cron at least keeps the refresh token "active" by exercising it, which Google counts as activity.
+- Future background features (a scheduled cron-tick that reads everyone's calendar daily) need fresh access tokens without piggy-backing on a user chat turn.
+
+**Architecture:**
+
+- A **separate worker Lambda** (`packages/backend/src/worker/handler.ts`) is added alongside the existing API Lambda. Same CDK code asset, different `handler` (`worker/handler.handler`), same env, same DDB + IoT permissions.
+- An **EventBridge rule** at `rate(30 minutes)` invokes the worker. 30 min is well inside the 1-hour access-token lifetime, so a row's `expiresAt` is always renewed before it actually expires — even for users with no recent chat activity.
+- The worker calls `refreshAllUserSkills()`, which:
+  1. `userSkillsRepo.scanAll()` — DDB Scan across all partitions (low-volume demo; replace with a GSI on `data.skill_id` if cardinality grows).
+  2. For each row, call `handler.install.refreshConfig(row.data.config)` exactly as `buildSkills` does.
+  3. On `expiresAt` change: `userSkillsRepo.updateData(...)` + `publishRealtimeEvent` (the user's settings page reflects the new `expiresAt` live, if displayed).
+  4. **Per-row failure is logged but does not halt the loop** — a single bad refresh token (e.g. user revoked access at Google) shouldn't block the other rows.
+- The row stays even on failure. The next user-driven action (open settings, try to chat) gets the same `invalid_grant` and the UI surfaces a "reconnect" affordance.
+
+**Local dev:** EventBridge doesn't fire on `localhost`, so the worker is exposed two other ways:
+- `./packages/backend/scripts/run_refresh_user_skills.ts` — manual one-shot trigger that wraps the same `refreshAllUserSkills()` call.
+- `e2e_skill.ts` exercises it inline (no real refresh round-trip — fake tokens just log + continue, proving the loop's error handling).
+
 ### Things we explicitly defer
 
 - Gmail, Drive, Sheets — same `defineGoogleSkill` machinery; one-line additions in `skills/google.ts` once Calendar works.
 - Slack, Telegram — `install.type === "auth"` flavour, more code (verification ping, bot tokens). Not in this issue.
-- Cron-based proactive refresh — Pensieve has one (`lib/cron-tick.ts`); we don't. The refresh-on-load above is sufficient until the demo grows scheduled jobs.
 - Multiple Google accounts per user. (Pensieve allows it via duplicate rows; we'll **dedupe on `(user_id, skill_id)` in the OAuth callback** — easier to reason about, smaller surface, can lift later.)
 - CSRF nonce in OAuth state. Pensieve doesn't have one either; the state is JSON of `{ skillId, userId }`. Acceptable for an authenticated-user flow but flag with a TODO.
 

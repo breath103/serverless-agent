@@ -526,6 +526,67 @@ CSS modules must not import Tailwind. Tailwind is already loaded once via `globa
 
 ---
 
+## CSS-module class names must always go through `styles.foo` — never a bare string
+
+CSS modules hash class names at build time (`.mt2` becomes `.demo_mt2_a8f3c`). If you define a class in a `.module.css` and reference it as a bare string in JSX (`className="mt2"`), the bare name does **not** match the hashed name — your styles silently don't apply, no error, no warning, the element just renders without the rule.
+
+This bites hardest when a `.module.css` defines helpers that *look like* Tailwind utilities (`.mt2`, `.flex`, `.gap4`, `.gap2`). At a glance the JSX looks correct ("oh, that's just Tailwind"); in reality it's a broken module reference that should have been `${styles.mt2}`.
+
+Rule: every class defined in a `.module.css` is applied via the `styles` import. If you find yourself defining helpers that mirror Tailwind utilities, **delete them** and use Tailwind directly — don't shadow framework utilities with hashed locals.
+
+```tsx
+// ❌ Wrong — bare "mt2" never matches the hashed module class; styles drop silently
+import styles from "./demo.module.css";
+<h1 className={`${styles.display} mt2`}>Title</h1>
+```
+
+```tsx
+// ✅ Correct (option A) — go through the styles import
+<h1 className={`${styles.display} ${styles.mt2}`}>Title</h1>
+```
+
+```tsx
+// ✅ Correct (option B, preferred) — use Tailwind directly, drop .mt2 from the module
+<h1 className={`${styles.display} mt-2`}>Title</h1>
+```
+
+If a `.module.css` exports `.mt2`, `.flex`, `.gap4`, `.flex-wrap` etc., that's a smell — they shadow Tailwind utilities and create exactly this confusion. Drop them; consume Tailwind from the JSX side.
+
+---
+
+## CSS modules must not redeclare `:root` design tokens
+
+Design tokens (`--bg`, `--text-1`, `--accent-1`, `--border`, the channel palette, etc.) live on `:root` in `global.css` exactly once. CSS modules **consume** them via `var(--token)` — they do not redeclare them inside their own scope.
+
+Redeclaring a token in a `.module.css` (e.g. `.demo { --bg: #0E0A07; --text-1: #EFE4CF; ... }`) creates a parallel schema. The value now lives in two places: `:root` and the module's local scope. Change one, the other doesn't pick it up. The next person to retune the token in `global.css` will be surprised when the module's scope still resolves the old value.
+
+Rule: tokens are declared once on `:root`. Modules consume `var(--token)`; they don't define `--token`.
+
+```css
+/* ❌ Wrong — redeclares global tokens inside the module's scope */
+.demo {
+  --bg:     #0E0A07;
+  --cream:  #EFE4CF;
+  --cyan:   #5BC8FF;
+  /* …30 more shadowing :root… */
+
+  background: var(--bg);
+  color: var(--cream);
+}
+```
+
+```css
+/* ✅ Correct — consume from :root, declare only module-specific styles */
+.demo {
+  background: var(--bg);
+  color: var(--cream);
+}
+```
+
+The exception is *derived* values. A module can compute a local var from a token (e.g. `--demo-tint: color-mix(in oklch, var(--bg) 80%, var(--cyan) 20%);`) because that derived shape is module-specific. What you can't do is repeat the canonical token value.
+
+---
+
 ## Only export React components from `.tsx` files
 
 Every export from a `.tsx` file must be a React component (or a type). Exporting non-component values (cva variants, constants, utility functions) breaks Vite's React Fast Refresh — the entire file is invalidated on every change, cascading to all importers.

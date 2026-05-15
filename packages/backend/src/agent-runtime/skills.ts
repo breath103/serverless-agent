@@ -72,7 +72,7 @@ export async function buildSkills(opts: {
   const rows = await userSkillsRepo.listForUser(opts.userId);
   for (const row of rows) {
     // Channel skills aren't LLM tools — they ferry messages via orchestrate.ts.
-    if (skillHandlers[row.data.skill_id].install.type === "telegram") continue;
+    if (skillHandlers[row.data.skill_id].install.type !== "oauth2") continue;
     let config;
     try {
       ({ config } = await refreshAndPersist(row));

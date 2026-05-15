@@ -14,7 +14,7 @@ export function SidebarBrandHeader({
   return (
     <div
       className={cn(
-        "flex h-16 items-center border-b border-amber",
+        "flex h-16 items-center border-b border-cream-hair",
         collapsed ? "justify-center" : "justify-between gap-2 pr-2 pl-4",
       )}
     >
@@ -22,7 +22,7 @@ export function SidebarBrandHeader({
         <div className="min-w-0">
           <div className="hud-eyebrow">SERVERLESS // AGENT</div>
           <div
-            className="mt-0.5 truncate text-mint"
+            className="mt-0.5 truncate text-cream"
             style={{
               fontSize: "0.75rem",
               letterSpacing: "0.06em",

@@ -34,7 +34,7 @@ export function MemoryList({
       <div className="flex flex-col items-center justify-center gap-2 py-24 text-center">
         <p className="hud-label">NO MEMORIES STORED</p>
         <p className="hud-caption">
-          PRESS <span className="text-amber">[NEW]</span> TO INITIALIZE FIRST RECORD
+          PRESS <span style={{ color: "var(--accent-1)" }}>[NEW]</span> TO INITIALIZE FIRST RECORD
         </p>
       </div>
     );

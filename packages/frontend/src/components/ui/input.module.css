@@ -1,19 +1,15 @@
-/* Terminal-HUD input.
-   Transparent fill, amber hairline border, mono uppercase placeholder.
-   On focus, border switches to mint and the bloom intensifies — same trick as
-   the button.
-*/
+/* Phosphor Spectrum input.
+   Quiet cream-hair border at rest — chrome shouldn't compete with content.
+   On focus, border switches to the section accent (--accent-1) so the lit
+   input picks up the channel color. */
 
 .input {
   color: var(--text-1);
   background: transparent;
-  border: 1px solid var(--amber);
+  border: 1px solid var(--cream-hair);
   border-radius: 0;
   letter-spacing: 0.04em;
-  caret-color: var(--amber);
-  box-shadow:
-    0 0 0.5px var(--amber),
-    0 0 5px color-mix(in oklch, var(--amber) 18%, transparent);
+  caret-color: var(--accent-1);
   transition:
     border-color 0.15s linear,
     box-shadow 0.15s linear,
@@ -22,25 +18,23 @@
 
 .input::placeholder {
   color: var(--text-2);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0;
+  text-transform: none;
   opacity: 1;
 }
 
 .input:hover:not(:disabled) {
-  box-shadow:
-    0 0 0.5px var(--amber),
-    0 0 8px color-mix(in oklch, var(--amber) 28%, transparent);
+  border-color: var(--cream-dim);
 }
 
 .input:focus,
 .input:focus-visible {
-  border-color: var(--mint);
-  caret-color: var(--mint);
+  border-color: var(--accent-1);
+  caret-color: var(--accent-1);
   outline: none;
   box-shadow:
-    0 0 0.5px var(--mint),
-    0 0 10px color-mix(in oklch, var(--mint) 38%, transparent);
+    0 0 0.5px var(--accent-1),
+    0 0 10px color-mix(in oklch, var(--accent-1) 30%, transparent);
 }
 
 .input[aria-invalid="true"],
@@ -49,11 +43,11 @@
   caret-color: var(--red);
   box-shadow:
     0 0 0.5px var(--red),
-    0 0 8px color-mix(in oklch, var(--red) 32%, transparent);
+    0 0 8px color-mix(in oklch, var(--red) 28%, transparent);
 }
 
 .input:disabled {
   color: var(--text-3);
-  border-color: var(--amber-hair);
-  box-shadow: 0 0 0.5px var(--amber-hair);
+  border-color: var(--cream-hair);
+  opacity: 0.5;
 }

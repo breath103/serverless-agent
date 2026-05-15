@@ -16,6 +16,7 @@ export function ChatsPage() {
   return (
     <PageShell
       title="Chats"
+      channel="cyan"
       scroll={false}
       actions={(
         <Button size="sm" variant="primary" onClick={() => void navigate({ to: "/dashboard/chats" })}>

@@ -49,8 +49,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       <select
         ref={ref}
         className={cn(
-          "h-10 w-full appearance-none border border-amber bg-background px-3 pr-10 text-amber",
-          "outline-none focus:border-mint",
+          "h-10 w-full appearance-none border border-cream-hair bg-background px-3 pr-10 text-cream",
+          "outline-none focus:border-cyan",
           "transition-colors duration-150",
           className,
         )}
@@ -63,7 +63,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       </select>
       <CaretDownIcon
         size={13}
-        className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-amber-dim"
+        className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-cream-dim"
       />
     </div>
   ),

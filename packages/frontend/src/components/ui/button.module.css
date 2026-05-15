@@ -1,15 +1,14 @@
-/* Terminal-HUD button.
+/* Phosphor Spectrum button.
    Two tiers:
-   - Filled (primary): high-contrast solid block, black text on a mint or amber
-     fill. The "GO" affordance — used for the dominant CTA on a page.
-   - Bordered (default / secondary / destructive): transparent fill, currentColor
-     border, phosphor edge halo. The inline tier.
-   No dashed borders — they read as "draft" / "placeholder" rather than
-   "actionable" and the user disliked them.
+   - Filled (primary): solid section-channel block, dark-canvas text. The
+     dominant CTA on a page — picks up the route's --accent-1 so it's
+     channel-aware (cyan on chats, magenta on memories, etc).
+   - Bordered (default / secondary / destructive): transparent fill,
+     currentColor border, phosphor edge halo. The inline tier.
 */
 
 .button {
-  --btn-color: var(--amber);
+  --btn-color: var(--cream);
   color: var(--btn-color);
   background: transparent;
   border: 1px solid var(--btn-color);
@@ -47,40 +46,39 @@
 }
 
 /* ── Bordered variants (inline tier) ── */
-.button[data-variant="default"]     { --btn-color: var(--amber); }
-.button[data-variant="secondary"]   { --btn-color: var(--mint); }
+.button[data-variant="default"]     { --btn-color: var(--cream); }
+.button[data-variant="secondary"]   { --btn-color: var(--accent-1); }
 .button[data-variant="destructive"] { --btn-color: var(--red); }
 
 /* ── Filled variant (primary CTA) ──
-   Solid mint block, black text. Highest visual punch on the page.
-   Bloom is in mint (the fill color) so the halo reads as light bleeding
-   off the button. Black text gets text-shadow:none — black phosphor
-   doesn't glow and the global halo would muddy the type.
+   Solid block in the section channel (--accent-1), dark canvas text.
+   Highest visual punch on the page. Bloom matches the channel hue.
+   Black text gets text-shadow:none — the global halo would muddy it.
 */
 .button[data-variant="primary"] {
-  --btn-color: var(--mint);
-  background-color: var(--mint);
+  --btn-color: var(--accent-1);
+  background-color: var(--accent-1);
   color: var(--bg);
-  border-color: var(--mint);
+  border-color: var(--accent-1);
   font-weight: 700;
   box-shadow:
-    0 0 0.5px var(--mint),
-    0 0 14px color-mix(in oklch, var(--mint) 32%, transparent);
+    0 0 0.5px var(--accent-1),
+    0 0 14px color-mix(in oklch, var(--accent-1) 32%, transparent);
 }
 .button[data-variant="primary"],
 .button[data-variant="primary"] * {
   text-shadow: none;
 }
 .button[data-variant="primary"]:hover:not(:disabled) {
-  background-color: color-mix(in oklch, var(--mint) 82%, white);
+  background-color: color-mix(in oklch, var(--accent-1) 82%, white);
   box-shadow:
-    0 0 0.5px var(--mint),
-    0 0 22px color-mix(in oklch, var(--mint) 55%, transparent);
+    0 0 0.5px var(--accent-1),
+    0 0 22px color-mix(in oklch, var(--accent-1) 55%, transparent);
 }
 .button[data-variant="primary"]:active:not(:disabled) {
-  background-color: color-mix(in oklch, var(--mint) 88%, var(--bg));
+  background-color: color-mix(in oklch, var(--accent-1) 88%, var(--bg));
 }
 .button[data-variant="primary"]:disabled {
-  background-color: color-mix(in oklch, var(--mint) 35%, var(--bg));
-  border-color: color-mix(in oklch, var(--mint) 35%, var(--bg));
+  background-color: color-mix(in oklch, var(--accent-1) 35%, var(--bg));
+  border-color: color-mix(in oklch, var(--accent-1) 35%, var(--bg));
 }

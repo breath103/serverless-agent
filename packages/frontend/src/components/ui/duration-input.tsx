@@ -68,9 +68,9 @@ function Field({
         onChange(clamped);
       }}
       className={cn(
-        "w-10 border border-amber-hair bg-transparent px-1.5 py-1 text-center text-sm text-mint tabular-nums",
+        "w-10 border border-cream-hair bg-transparent px-1.5 py-1 text-center text-sm text-cream tabular-nums",
         "transition-colors outline-none",
-        "hover:border-amber focus:border-mint",
+        "hover:border-cream-dim focus:border-cyan",
         "[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
         "[-moz-appearance:textfield]",
       )}
@@ -79,5 +79,5 @@ function Field({
 }
 
 function Sep() {
-  return <span className="text-amber-dim tabular-nums">:</span>;
+  return <span className="text-cream-dim tabular-nums">:</span>;
 }

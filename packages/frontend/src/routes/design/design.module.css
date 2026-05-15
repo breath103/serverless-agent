@@ -1,0 +1,599 @@
+/* Phosphor Spectrum design reference — composition-only.
+   All tokens cascade from global :root (see global.css). All channel
+   utilities (channel-cyan / channel-magenta / etc.) are global @utility
+   classes from global.css — this module only owns demo-specific layout
+   and component styles (.routeCard, .panel, .variantA, etc.).
+   See documents/design-system/2026-05-15_phosphor-spectrum-design-system.md */
+
+/* =============================================================================
+   Typography
+   ============================================================================= */
+.display {
+  font-size: 3rem;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  color: var(--accent-1, var(--cream));
+  text-transform: uppercase;
+  text-shadow:
+    -0.6px 0 0 color-mix(in oklch, var(--coral) 75%, transparent),
+     0.6px 0 0 color-mix(in oklch, var(--cyan)  75%, transparent),
+    var(--bloom-near),
+    var(--bloom-mid),
+    0 0 14px color-mix(in oklch, currentColor 30%, transparent);
+}
+.h1 {
+  font-size: 1.75rem;
+  line-height: 1.15;
+  font-weight: 700;
+  color: var(--cream);
+  letter-spacing: 0;
+}
+.h2 {
+  font-size: 1.125rem;
+  line-height: 1.2;
+  font-weight: 600;
+  color: var(--cream);
+}
+.eyebrow {
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--accent-1-dim, var(--cream-dim));
+}
+.label {
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--cream);
+}
+.body {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--cream);
+}
+.caption {
+  font-size: 0.6875rem;
+  color: var(--cream-dim);
+  letter-spacing: 0.02em;
+}
+
+/* =============================================================================
+   Page chrome
+   ============================================================================= */
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 3.5rem 2.5rem 5rem;
+}
+.pageHeader {
+  margin-bottom: 3rem;
+}
+.titleRule {
+  height: 1px;
+  background: var(--accent-1, var(--cream-hair));
+  margin-top: 1.25rem;
+  box-shadow: 0 0 0.5px var(--accent-1, var(--cream-hair)),
+              0 0 6px color-mix(in oklch, var(--accent-1, var(--cream)) 22%, transparent);
+}
+.section {
+  margin-top: 3rem;
+}
+.sectionHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 0.875rem;
+  margin-bottom: 1.5rem;
+}
+.sectionNumber {
+  font-size: 0.6875rem;
+  color: var(--cream-dim);
+  letter-spacing: 0.12em;
+  font-weight: 600;
+}
+.sectionTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--cream);
+}
+.sectionRule {
+  flex: 1;
+  height: 1px;
+  background: var(--cream-hair);
+}
+
+/* =============================================================================
+   Palette swatches
+   ============================================================================= */
+.swatchRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.5rem;
+}
+.swatch {
+  border: 1px solid var(--cream-hair);
+  padding: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  min-height: 96px;
+  justify-content: flex-end;
+}
+.swatchBlock {
+  flex: 1;
+  margin: -0.875rem -0.875rem 0;
+}
+.swatchName {
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.swatchHex {
+  font-size: 0.625rem;
+  color: var(--cream-dim);
+}
+.channelStack {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.channelStrip {
+  display: grid;
+  grid-template-columns: 88px repeat(3, 1fr);
+  gap: 0.5rem;
+  align-items: center;
+}
+.channelStripLabel {
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--accent-1);
+}
+.tier {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 0 0.625rem;
+  border: 1px solid var(--cream-hair);
+}
+.tierName {
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cream-dim);
+}
+
+/* =============================================================================
+   Channel routing demo — three "page cards" side by side
+   ============================================================================= */
+.routingGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+.routeCard {
+  background: transparent;
+  border: 1px solid var(--cream-hair);
+  border-top: 2px solid var(--accent-1);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 220px;
+  box-shadow:
+    0 -1px 10px color-mix(in oklch, var(--accent-1) 26%, transparent),
+    inset 0 1px 0 color-mix(in oklch, var(--accent-1) 30%, transparent);
+}
+.routeCardEyebrow {
+  font-size: 0.625rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent-1-dim);
+  font-weight: 600;
+}
+.routeCardTitle {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--accent-1);
+  letter-spacing: 0;
+}
+.routeCardRule {
+  display: none;
+}
+.routeCardBody {
+  font-size: 0.8125rem;
+  color: var(--cream);
+  line-height: 1.5;
+}
+.routeCardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 0.75rem;
+}
+.routeCardMeta {
+  font-size: 0.625rem;
+  color: var(--cream-dim);
+  letter-spacing: 0.05em;
+}
+
+/* =============================================================================
+   Surface variants comparison
+   ============================================================================= */
+.variantsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+}
+.variantLabel {
+  font-size: 0.625rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cream-dim);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+.variantCaption {
+  font-size: 0.6875rem;
+  color: var(--cream-dim);
+  margin-top: 0.625rem;
+  line-height: 1.45;
+}
+
+/* Variant A — transparent surface + colored top bar (current direction) */
+.variantA {
+  background: transparent;
+  border: 1px solid var(--cream-hair);
+  border-top: 2px solid var(--accent-1);
+  padding: 1.125rem 1rem 1rem;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  box-shadow: 0 -1px 10px color-mix(in oklch, var(--accent-1) 26%, transparent);
+}
+
+/* Variant B — per-section canvas tint, no card chrome
+   The canvas uses the darkest saturated tier of the channel (channel-hair
+   mixed with bg) so cream text and bright channel-color titles both have
+   real contrast. Mimics Warakami84: bright "Google" on deep teal-black,
+   not light-teal-on-grey-teal. Same hue family, big luminance gap. */
+.variantB {
+  background: color-mix(in oklch, var(--bg) 75%, var(--accent-1-hair) 25%);
+  border: none;
+  border-top: 2px solid var(--accent-1);
+  padding: 1.125rem 1rem 1rem;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  box-shadow: 0 -1px 10px color-mix(in oklch, var(--accent-1) 26%, transparent);
+}
+
+/* Variant C — diagonal-hatch surface in channel color */
+.variantC {
+  background-color: transparent;
+  background-image: repeating-linear-gradient(
+    45deg,
+    color-mix(in oklch, var(--accent-1) 14%, transparent) 0 4px,
+    transparent 4px 10px
+  );
+  border: 1px solid var(--cream-hair);
+  border-top: 2px solid var(--accent-1);
+  padding: 1.125rem 1rem 1rem;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  box-shadow: 0 -1px 10px color-mix(in oklch, var(--accent-1) 26%, transparent);
+}
+
+.variantTitle {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--accent-1);
+}
+.variantEyebrow {
+  font-size: 0.625rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent-1-dim);
+  font-weight: 600;
+}
+.variantBody {
+  font-size: 0.75rem;
+  color: var(--cream);
+  line-height: 1.5;
+  margin-top: 0.25rem;
+}
+.variantFooter {
+  margin-top: auto;
+  padding-top: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.625rem;
+  color: var(--cream-dim);
+}
+
+/* =============================================================================
+   Panels — tinted background + quiet border (new pattern)
+   ============================================================================= */
+.panelGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+.panel {
+  background: transparent;
+  border: 1px solid var(--cream-hair);
+  border-top: 2px solid var(--accent-1);
+  padding: 1rem 1.125rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  box-shadow: 0 -1px 10px color-mix(in oklch, var(--accent-1) 26%, transparent);
+}
+.panelTitle {
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--accent-1);
+}
+.panelRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.375rem 0;
+  border-bottom: 1px solid var(--cream-hair);
+  font-size: 0.8125rem;
+  color: var(--cream);
+}
+.panelRow:last-child { border-bottom: none; }
+.panelValue {
+  color: var(--accent-1);
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+}
+
+/* =============================================================================
+   Buttons
+   ============================================================================= */
+.btnRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+.btnPrimary {
+  background: var(--accent-1);
+  color: var(--bg);
+  border: 1px solid var(--accent-1);
+  padding: 0.625rem 1.125rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.12s linear;
+  text-shadow: none;
+  box-shadow:
+    0 0 0.5px var(--accent-1),
+    0 0 12px color-mix(in oklch, var(--accent-1) 35%, transparent);
+}
+.btnPrimary:hover {
+  background: color-mix(in oklch, var(--accent-1) 86%, var(--bg));
+}
+.btnSecondary {
+  background: transparent;
+  color: var(--accent-1);
+  border: 1px solid var(--accent-1);
+  padding: 0.5625rem 1rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.12s linear;
+}
+.btnSecondary:hover {
+  background: color-mix(in oklch, var(--accent-1) 14%, transparent);
+}
+.btnDashed {
+  background: transparent;
+  color: var(--accent-1-dim);
+  border: 1px dashed color-mix(in oklch, var(--accent-1) 55%, transparent);
+  padding: 0.5625rem 1rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btnDashed:hover {
+  color: var(--accent-1);
+  border-color: var(--accent-1);
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.1875rem 0.5rem;
+  border: 1px solid currentColor;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* =============================================================================
+   Forms
+   ============================================================================= */
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
+}
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.formLabel {
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--cream);
+}
+.input {
+  background: transparent;
+  color: var(--cream);
+  border: 1px solid var(--cream-hair);
+  padding: 0.5rem 0.75rem;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  outline: none;
+  transition: border-color 0.12s linear;
+}
+.input::placeholder { color: var(--cream-dim); }
+.input:focus { border-color: var(--accent-1, var(--cream)); }
+.inputError { border-color: var(--error); color: var(--error); }
+.helperError {
+  font-size: 0.6875rem;
+  color: var(--error);
+}
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+.checkbox {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--cream-hair);
+  background: transparent;
+  display: inline-block;
+  position: relative;
+}
+.checkboxOn {
+  background: var(--accent-1);
+  border-color: var(--accent-1);
+}
+
+/* =============================================================================
+   Status row
+   ============================================================================= */
+.statusGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+.statusCell {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--statusColor, var(--cream-hair));
+  color: var(--statusColor, var(--cream));
+}
+.statusWord {
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.statusCaption {
+  font-size: 0.625rem;
+  color: var(--cream-dim);
+  letter-spacing: 0.04em;
+  margin-top: 0.125rem;
+}
+
+/* =============================================================================
+   Pixel-art glyph row (illustrative — real impl would use Pixelarticons)
+   ============================================================================= */
+.iconRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+.iconCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--cream);
+}
+.iconLabel {
+  font-size: 0.625rem;
+  color: var(--cream-dim);
+  letter-spacing: 0.04em;
+}
+
+/* =============================================================================
+   Sidebar mock — shows channel-routed navigation
+   ============================================================================= */
+.sidebarMock {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 0;
+  border: 1px solid var(--cream-hair);
+}
+.sidebarMockNav {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  padding: 1rem 0;
+  border-right: 1px solid var(--cream-hair);
+}
+.sidebarBrand {
+  padding: 0 1rem 1rem;
+  font-size: 0.625rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cream-dim);
+  font-weight: 600;
+  border-bottom: 1px solid var(--cream-hair);
+  margin-bottom: 0.75rem;
+}
+.sidebarItem {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--cream-dim);
+  cursor: pointer;
+}
+.sidebarItem:hover {
+  color: var(--cream);
+}
+.sidebarItemActive {
+  background: var(--accent-1);
+  color: var(--bg);
+  text-shadow: none;
+}
+.sidebarItemActive * { text-shadow: none; }
+.sidebarMockBody {
+  padding: 1.5rem;
+  background: transparent;
+  min-height: 180px;
+  border-top: 2px solid var(--accent-1);
+  box-shadow: 0 -1px 10px color-mix(in oklch, var(--accent-1) 26%, transparent);
+}
+
+/* Helpers removed — use Tailwind utilities (mt-2, mt-3, flex, gap-2, etc.). */

@@ -45,7 +45,7 @@ export async function runChatTurn(opts: {
   const systemPrompt = buildSystemPrompt(declarations.declarations, profile);
   const tools = toolDefinitionsForLlm();
 
-  const initialRows = await loadSessionRows(sessionId);
+  const initialRows = await chatSessionsRepo.listMessagesAsc(sessionId);
   const history: LlmMessage[] = rowsToLlmMessages(initialRows);
   annotateLastUserMessageWithTime(history, profile?.timezone);
 
@@ -110,10 +110,6 @@ export async function runChatTurn(opts: {
     });
     throw err;
   }
-}
-
-async function loadSessionRows(sessionId: string) {
-  return await chatSessionsRepo.listMessageDataAsc(sessionId);
 }
 
 type ProfileInfo = Pick<ProfileRow, "name" | "language" | "timezone" | "about"> | null;

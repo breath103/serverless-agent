@@ -3,10 +3,10 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
 import {
-  buildClearSessionCookie,
-  buildSessionSetCookie,
+  clearSessionCookie,
   parseSessionCookie,
   resolveSession,
+  setSessionCookie,
   signIn,
   signOut,
   signUp,
@@ -58,7 +58,7 @@ app.post("/api/auth/sign-up", async (c) => {
   if (!parsed.success) throw new HTTPException(400, { message: "invalid_body" });
   try {
     const result = await signUp(parsed.data);
-    c.header("Set-Cookie", buildSessionSetCookie(result.sessionId, result.expiresAt));
+    setSessionCookie(c, result.sessionId, result.expiresAt);
     return c.json({ user: result.user });
   } catch (err) {
     if (err instanceof UsernameTakenError) {
@@ -73,14 +73,14 @@ app.post("/api/auth/sign-in", async (c) => {
   if (!parsed.success) throw new HTTPException(400, { message: "invalid_body" });
   const result = await signIn(parsed.data);
   if (!result) throw new HTTPException(401, { message: "invalid_credentials" });
-  c.header("Set-Cookie", buildSessionSetCookie(result.sessionId, result.expiresAt));
+  setSessionCookie(c, result.sessionId, result.expiresAt);
   return c.json({ user: result.user });
 });
 
 app.post("/api/auth/sign-out", async (c) => {
   const sessionId = parseSessionCookie(c.req.header("cookie"));
   if (sessionId) await signOut(sessionId);
-  c.header("Set-Cookie", buildClearSessionCookie());
+  clearSessionCookie(c);
   return c.json({ ok: true });
 });
 

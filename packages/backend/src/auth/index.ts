@@ -1,5 +1,8 @@
 import { randomBytes } from "node:crypto";
 
+import { deleteCookie, setCookie } from "hono/cookie";
+
+import type { AppContext } from "../lib/app-context.js";
 import { profilesRepo } from "../profiles/profiles-repository.js";
 import type { UserRow } from "../types/database.js";
 import { usersRepo } from "../users/users-repository.js";
@@ -108,26 +111,25 @@ export function parseSessionCookie(cookieHeader: string | undefined | null): str
   return null;
 }
 
-export function buildSessionSetCookie(sessionId: string, expiresAt: Date): string {
-  const attrs = [
-    `${SESSION_COOKIE}=${encodeURIComponent(sessionId)}`,
-    "Path=/",
-    `Expires=${expiresAt.toUTCString()}`,
-    "HttpOnly",
-    "SameSite=Lax",
-    "Secure",
-  ];
-  return attrs.join("; ");
+// Safari rejects `Secure` cookies over plain HTTP, even on localhost; Chrome allows them.
+function isRequestSecure(c: AppContext): boolean {
+  const proto = (c.req.header("x-forwarded-proto") ?? "https").split(",")[0].trim().toLowerCase();
+  return proto !== "http";
 }
 
-export function buildClearSessionCookie(): string {
-  const attrs = [
-    `${SESSION_COOKIE}=`,
-    "Path=/",
-    "Expires=Thu, 01 Jan 1970 00:00:00 GMT",
-    "HttpOnly",
-    "SameSite=Lax",
-    "Secure",
-  ];
-  return attrs.join("; ");
+export function setSessionCookie(c: AppContext, sessionId: string, expiresAt: Date): void {
+  setCookie(c, SESSION_COOKIE, sessionId, {
+    path: "/",
+    expires: expiresAt,
+    httpOnly: true,
+    sameSite: "Lax",
+    secure: isRequestSecure(c),
+  });
+}
+
+export function clearSessionCookie(c: AppContext): void {
+  deleteCookie(c, SESSION_COOKIE, {
+    path: "/",
+    secure: isRequestSecure(c),
+  });
 }

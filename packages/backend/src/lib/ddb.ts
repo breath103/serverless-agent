@@ -134,7 +134,7 @@ export class DdbTable<TRow, TKey extends DdbKey> {
   }
 
   /** Paginated query — collects every matching row across all pages. */
-  async queryAll(opts: {
+  private async queryAll(opts: {
     keyConditionExpression: string;
     expressionAttributeNames?: DdbNames;
     expressionAttributeValues: DdbValues;

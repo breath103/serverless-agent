@@ -1,69 +1,34 @@
 import { randomUUID } from "node:crypto";
 
-import {
-  DeleteCommand,
-  GetCommand,
-  PutCommand,
-  QueryCommand,
-  ScanCommand,
-} from "@aws-sdk/lib-dynamodb";
-
-import { ddb, tables } from "../lib/ddb.js";
+import { type DdbTable, ddbTables } from "../lib/ddb.js";
 import type { UserSkillRow } from "../types/database.js";
 import type { InstallableSkillConfig, InstallableSkillId } from "./index.js";
 import { taggedConfig } from "./index.js";
 
-type DdbKey = Record<string, string>;
+class UserSkillsRepository {
+  constructor(private readonly table: DdbTable<UserSkillRow, { user_id: string; id: string }>) {}
 
-async function queryAllForUser(userId: string): Promise<UserSkillRow[]> {
-  const rows: UserSkillRow[] = [];
-  let lastKey: DdbKey | undefined;
-  do {
-    const res = await ddb.get().send(new QueryCommand({
-      TableName: tables.userSkills(),
-      KeyConditionExpression: "user_id = :u",
-      ExpressionAttributeValues: { ":u": userId },
-      ExclusiveStartKey: lastKey,
-    }));
-    rows.push(...((res.Items ?? []) as UserSkillRow[]));
-    lastKey = res.LastEvaluatedKey as DdbKey | undefined;
-  } while (lastKey);
-  return rows;
-}
+  private allForUser(userId: string): Promise<UserSkillRow[]> {
+    return this.table.queryAll({
+      keyConditionExpression: "user_id = :u",
+      expressionAttributeValues: { ":u": userId },
+    });
+  }
 
-export const userSkillsRepo = {
   async listForUser(userId: string): Promise<UserSkillRow[]> {
-    const rows = await queryAllForUser(userId);
+    const rows = await this.allForUser(userId);
     rows.sort((a, b) => a.created_at.localeCompare(b.created_at));
     return rows;
-  },
+  }
 
-  /**
-   * Scan the whole user_skills table. Used by the background-refresh worker
-   * (cron) to iterate every row across users. Low-volume demo — replace with
-   * a GSI lookup or a per-user fanout when cardinality matters.
-   */
-  async scanAll(): Promise<UserSkillRow[]> {
-    const rows: UserSkillRow[] = [];
-    let lastKey: DdbKey | undefined;
-    do {
-      const res = await ddb.get().send(new ScanCommand({
-        TableName: tables.userSkills(),
-        ExclusiveStartKey: lastKey,
-      }));
-      rows.push(...((res.Items ?? []) as UserSkillRow[]));
-      lastKey = res.LastEvaluatedKey as DdbKey | undefined;
-    } while (lastKey);
-    return rows;
-  },
+  /** Low-volume demo — swap for a GSI lookup or per-user fanout when cardinality matters. */
+  scanAll(): Promise<UserSkillRow[]> {
+    return this.table.scanAll();
+  }
 
   async getByIdForUser(userId: string, id: string): Promise<UserSkillRow | null> {
-    const res = await ddb.get().send(new GetCommand({
-      TableName: tables.userSkills(),
-      Key: { user_id: userId, id },
-    }));
-    return (res.Item as UserSkillRow | undefined) ?? null;
-  },
+    return this.table.get({ user_id: userId, id });
+  }
 
   /**
    * Upsert by (user_id, skill_id). Reconnecting the same provider for the
@@ -75,7 +40,7 @@ export const userSkillsRepo = {
     skillId: InstallableSkillId;
     config: InstallableSkillConfig["config"];
   }): Promise<UserSkillRow> {
-    const all = await queryAllForUser(opts.userId);
+    const all = await this.allForUser(opts.userId);
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- single installable variant today; comparison becomes meaningful on a 2nd skill
     const existing = all.find((r) => r.data.skill_id === opts.skillId) ?? null;
     const now = new Date().toISOString();
@@ -86,12 +51,9 @@ export const userSkillsRepo = {
       created_at: existing?.created_at ?? now,
       updated_at: now,
     };
-    await ddb.get().send(new PutCommand({
-      TableName: tables.userSkills(),
-      Item: row,
-    }));
+    await this.table.put(row);
     return row;
-  },
+  }
 
   async updateData(
     userId: string,
@@ -105,19 +67,13 @@ export const userSkillsRepo = {
       data,
       updated_at: new Date().toISOString(),
     };
-    await ddb.get().send(new PutCommand({
-      TableName: tables.userSkills(),
-      Item: updated,
-    }));
+    await this.table.put(updated);
     return updated;
-  },
+  }
 
-  async deleteForUser(userId: string, id: string): Promise<UserSkillRow | null> {
-    const res = await ddb.get().send(new DeleteCommand({
-      TableName: tables.userSkills(),
-      Key: { user_id: userId, id },
-      ReturnValues: "ALL_OLD",
-    }));
-    return (res.Attributes as UserSkillRow | undefined) ?? null;
-  },
-};
+  deleteForUser(userId: string, id: string): Promise<UserSkillRow | null> {
+    return this.table.delete({ user_id: userId, id });
+  }
+}
+
+export const userSkillsRepo = new UserSkillsRepository(ddbTables.userSkills);

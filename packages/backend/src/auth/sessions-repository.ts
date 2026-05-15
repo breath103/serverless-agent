@@ -1,16 +1,12 @@
-import { DeleteCommand, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
-
-import { ddb, tables } from "../lib/ddb.js";
+import { type DdbTable, ddbTables } from "../lib/ddb.js";
 import type { SessionRow } from "../types/database.js";
 
-export const sessionsRepo = {
+class SessionsRepository {
+  constructor(private readonly table: DdbTable<SessionRow, { id: string }>) {}
+
   async get(id: string): Promise<SessionRow | null> {
-    const res = await ddb.get().send(new GetCommand({
-      TableName: tables.sessions(),
-      Key: { id },
-    }));
-    return (res.Item as SessionRow | undefined) ?? null;
-  },
+    return this.table.get({ id });
+  }
 
   async create(input: { id: string; userId: string; expiresAt: Date }): Promise<SessionRow> {
     const row: SessionRow = {
@@ -20,17 +16,13 @@ export const sessionsRepo = {
       expires_at_epoch: Math.floor(input.expiresAt.getTime() / 1000),
       created_at: new Date().toISOString(),
     };
-    await ddb.get().send(new PutCommand({
-      TableName: tables.sessions(),
-      Item: row,
-    }));
+    await this.table.put(row);
     return row;
-  },
+  }
 
   async delete(id: string): Promise<void> {
-    await ddb.get().send(new DeleteCommand({
-      TableName: tables.sessions(),
-      Key: { id },
-    }));
-  },
-};
+    await this.table.delete({ id });
+  }
+}
+
+export const sessionsRepo = new SessionsRepository(ddbTables.sessions);

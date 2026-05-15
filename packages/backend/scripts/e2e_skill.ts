@@ -18,9 +18,7 @@ import { randomUUID } from "node:crypto";
 
 import { loadConfig } from "shared/config";
 
-import { PutCommand } from "@aws-sdk/lib-dynamodb";
-
-import { ddb, tables } from "../src/lib/ddb.js";
+import { ddbTables } from "../src/lib/ddb.js";
 import { refreshAllUserSkills } from "../src/worker/refresh-user-skills.js";
 import { loadEnv } from "./lib/env.js";
 
@@ -96,28 +94,25 @@ async function main(): Promise<void> {
   console.log("→ inject synthetic user_skill row");
   const syntheticId = randomUUID();
   const now = new Date().toISOString();
-  await ddb.get().send(new PutCommand({
-    TableName: tables.userSkills(),
-    Item: {
-      user_id: decoded.userId,
-      id: syntheticId,
-      data: {
-        skill_id: "google-calendar",
-        config: {
-          accessToken: "ya29.fake-access-token",
-          refreshToken: "1//fake-refresh-token",
-          // Past expiry → refreshAllUserSkills() will actually attempt a
-          // refresh against Google (which fails on placeholder creds), so
-          // the worker's failure-counting path gets exercised.
-          expiresAt: new Date(Date.now() - 60 * 1000).toISOString(),
-          email: "admin@example.invalid",
-          name: "Admin Tester",
-        },
+  await ddbTables.userSkills.put({
+    user_id: decoded.userId,
+    id: syntheticId,
+    data: {
+      skill_id: "google-calendar",
+      config: {
+        accessToken: "ya29.fake-access-token",
+        refreshToken: "1//fake-refresh-token",
+        // Past expiry → refreshAllUserSkills() will actually attempt a
+        // refresh against Google (which fails on placeholder creds), so
+        // the worker's failure-counting path gets exercised.
+        expiresAt: new Date(Date.now() - 60 * 1000).toISOString(),
+        email: "admin@example.invalid",
+        name: "Admin Tester",
       },
-      created_at: now,
-      updated_at: now,
     },
-  }));
+    created_at: now,
+    updated_at: now,
+  });
 
   console.log("→ GET /api/skills/installed (should include synthetic row)");
   const listed = await api<{ id: string; data: { skill_id: string } }[]>(cookie, "/api/skills/installed");

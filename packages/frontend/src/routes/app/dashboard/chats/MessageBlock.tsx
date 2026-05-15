@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { SkillCall } from "@backend/agent-runtime/types";
 import type { ChatSessionMessageRow } from "@backend/types/database";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
-import { CaretRightIcon, CheckCircleIcon, CircleNotchIcon, CodeIcon, GlobeIcon, TreeStructureIcon, WarningCircleIcon } from "@phosphor-icons/react";
+import { CalendarIcon, CaretRightIcon, CheckCircleIcon, CircleNotchIcon, CodeIcon, GlobeIcon, TreeStructureIcon, WarningCircleIcon } from "@phosphor-icons/react";
 
 import { MarkdownBlock } from "@/components/MarkdownBlock";
 import type { ChatSessionMessageData } from "@/contexts/RealtimeContext";
@@ -255,6 +255,16 @@ function describeSkillCall(call: SkillCall): { icon: SkillIconRef; label: string
         case "search": return { icon: GlobeIcon, label: "Searching the web", summary: call.params.query };
         case "imageSearch": return { icon: GlobeIcon, label: "Searching images", summary: call.params.query };
       }
+      break;
+
+    case "google-calendar":
+      switch (call.method) {
+        case "listCalendars": return { icon: CalendarIcon, label: "Listing calendars", summary: null };
+        case "listEvents": return { icon: CalendarIcon, label: "Listing events", summary: `${call.params.from} → ${call.params.to}` };
+        case "createEvent": return { icon: CalendarIcon, label: "Creating event", summary: call.params.title };
+        case "updateEvent": return { icon: CalendarIcon, label: "Updating event", summary: call.params.title ?? call.params.eventId };
+        case "deleteEvent": return { icon: CalendarIcon, label: "Deleting event", summary: call.params.eventId };
+      }
   }
   return { icon: CodeIcon, label: "Skill call", summary: null };
 }
@@ -310,6 +320,7 @@ function describeSkillCallResults(call: SkillCall): SkillCallResultRow[] | null 
       break;
 
     case "web-search":
+    case "google-calendar":
       return null;
   }
   return null;

@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 import {
   ChatCircleIcon,
+  PuzzlePieceIcon,
   TreeStructureIcon,
   UserCircleIcon,
 } from "@phosphor-icons/react";
@@ -23,6 +24,7 @@ const MAIN_ITEMS: Item[] = [
 
 const SETTINGS_ITEMS: Item[] = [
   { icon: UserCircleIcon, label: "PROFILE", href: "/dashboard/settings/profile" },
+  { icon: PuzzlePieceIcon, label: "SKILLS", href: "/dashboard/settings/skills" },
 ];
 
 export function Sidebar() {

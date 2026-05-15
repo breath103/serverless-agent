@@ -9,6 +9,7 @@ import { memoriesRoute } from "./routes/app/dashboard/memories/_route";
 import { memoryDetailRoute } from "./routes/app/dashboard/memories/$memoryId/_route";
 import { dashboardSettingsRoute } from "./routes/app/dashboard/settings/_route";
 import { profileRoute } from "./routes/app/dashboard/settings/profile/_route";
+import { skillsRoute } from "./routes/app/dashboard/settings/skills/_route";
 import { designCheckRoute } from "./routes/design-check/_route";
 import { loginRoute } from "./routes/login/_route";
 
@@ -27,6 +28,7 @@ export const routeTree = rootRoute.addChildren([
       ]),
       dashboardSettingsRoute.addChildren([
         profileRoute,
+        skillsRoute,
       ]),
     ]),
   ]),

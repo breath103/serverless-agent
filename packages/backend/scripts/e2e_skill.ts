@@ -20,30 +20,13 @@ import { loadConfig } from "shared/config";
 
 import { ddbTables } from "../src/lib/ddb.js";
 import { refreshAllUserSkills } from "../src/worker/refresh-user-skills.js";
+import { assert, loginAsUser } from "./lib/e2e.js";
 import { loadEnv } from "./lib/env.js";
 
 loadEnv("development");
 
 const config = loadConfig();
 const BASE = `http://localhost:${config.edge.devPort}`;
-
-// eslint-disable-next-line @typescript-eslint/no-restricted-types -- assertion helper accepts any truthy/falsy
-function assert(cond: unknown, msg: string): asserts cond {
-  if (!cond) throw new Error(`ASSERT: ${msg}`);
-}
-
-async function login(username: string, password: string): Promise<string> {
-  const res = await fetch(`${BASE}/api/auth/sign-in`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
-  if (!res.ok) throw new Error(`sign-in failed: ${res.status} ${await res.text()}`);
-  const setCookie = res.headers.get("set-cookie") ?? "";
-  const match = /sa_session=([^;]+)/.exec(setCookie);
-  assert(match, "no sa_session cookie returned from sign-in");
-  return `sa_session=${match[1]}`;
-}
 
 async function api<T>(cookie: string, path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -57,7 +40,7 @@ async function api<T>(cookie: string, path: string, init?: RequestInit): Promise
 
 async function main(): Promise<void> {
   console.log("→ sign in as admin");
-  const cookie = await login("admin", "admin");
+  const cookie = await loginAsUser(BASE, "admin", "admin");
 
   console.log("→ GET /api/skills/installed (initial)");
   const initial = await api<{ id: string }[]>(cookie, "/api/skills/installed");

@@ -20,8 +20,14 @@ export async function refreshAndPersist(
   row: UserSkillRow,
 ): Promise<{ config: InstallableSkillConfig["config"]; rotated: boolean }> {
   const handler = skillHandlers[row.data.skill_id];
-  const refreshed = await handler.install.refreshConfig(row.data.config);
-  if (refreshed.expiresAt === row.data.config.expiresAt) {
+  // Only oauth2 install variants carry a `refreshConfig` — channel skills
+  // (telegram) have no token lifecycle and stay as-is.
+  if (handler.install.type !== "oauth2") return { config: row.data.config, rotated: false };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument -- skill_id ↔ config correlation enforced by InstallableSkillConfig discriminator
+  const refreshed = await handler.install.refreshConfig(row.data.config as any);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access -- same correlation
+  if (refreshed.expiresAt === (row.data.config as any).expiresAt) {
     return { config: refreshed, rotated: false };
   }
 

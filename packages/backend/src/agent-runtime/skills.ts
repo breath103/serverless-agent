@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { taggedConfig } from "../skills/index.js";
+import { skillHandlers, taggedConfig } from "../skills/index.js";
 import { refreshAndPersist } from "../skills/refresh.js";
 import { userSkillsRepo } from "../skills/user-skills-repository.js";
 import type { SkillRuntimeInstance } from "./skill-runtimes/define.js";
@@ -71,6 +71,11 @@ export async function buildSkills(opts: {
   // webSearch, other healthy skills) stays functional for that turn.
   const rows = await userSkillsRepo.listForUser(opts.userId);
   for (const row of rows) {
+    // Channel-style skills (telegram, ...) are not exposed to the LLM —
+    // they ferry messages through `orchestrate.ts` instead of being callable
+    // tools inside `executeCode`. Skip them here so they never reach
+    // `loadSkill` / sandbox declarations.
+    if (skillHandlers[row.data.skill_id].install.type === "telegram") continue;
     let config;
     try {
       ({ config } = await refreshAndPersist(row));

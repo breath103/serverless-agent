@@ -256,3 +256,8 @@ function useModalApi() {
 export function useConfirm() {
   return useModalApi().confirm;
 }
+
+/** Returns `openModal(Component, props)` to mount a custom modal on the app-wide stack. */
+export function useOpenModal() {
+  return useModalApi().openModal;
+}

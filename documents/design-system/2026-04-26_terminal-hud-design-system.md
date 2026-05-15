@@ -1,5 +1,8 @@
 # Terminal-HUD Design System
 
+> **Superseded** by [`2026-05-15_phosphor-spectrum-design-system.md`](./2026-05-15_phosphor-spectrum-design-system.md).
+> Kept for reference. Don't use this as the active spec.
+
 A cyberpunk / sci-fi HUD / terminal aesthetic for the serverless-agent app. Black canvas, monospace type, geometric status icons, hairline boxes, and amber-on-black with a single mint-cyan operational color and a red failure color. Think Alien (Nostromo MU/TH/UR readout), Severance (Lumon refiner UI), and a Cyberpunk 2077 minimap — utilitarian, diegetic, slightly menacing, never decorative.
 
 ## 1. Mood & philosophy

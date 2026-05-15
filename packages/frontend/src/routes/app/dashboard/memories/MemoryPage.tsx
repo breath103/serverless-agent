@@ -54,6 +54,7 @@ export function MemoryPage() {
   return (
     <PageShell
       title="Memory"
+      channel="magenta"
       eyebrow="DASHBOARD // MEMORY"
       actions={(
         <>

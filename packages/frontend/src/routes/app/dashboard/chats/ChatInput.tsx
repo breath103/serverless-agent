@@ -58,13 +58,13 @@ export function ChatInput({
   };
 
   return (
-    <div className="shrink-0 border-t border-amber bg-background px-6 py-3">
+    <div className="shrink-0 border-t border-cream-hair bg-background px-6 py-3">
       <div className="mx-auto flex max-w-3xl items-end gap-2">
         <div
           className={cn(
-            "flex min-h-11 flex-1 items-center border border-amber bg-background",
+            "flex min-h-11 flex-1 items-center border border-cream-hair bg-background",
             "transition-colors duration-150",
-            "focus-within:border-mint",
+            "focus-within:border-cyan",
           )}
         >
           {suggestions.length > 0 && (
@@ -85,8 +85,8 @@ export function ChatInput({
             rows={1}
             placeholder=">_ TYPE A MESSAGE..."
             className={cn(
-              "w-full resize-none bg-transparent px-4 py-2.5 text-amber",
-              "outline-none placeholder:text-amber-dim",
+              "w-full resize-none bg-transparent px-4 py-2.5 text-cream",
+              "outline-none placeholder:text-cream-dim",
             )}
             style={{ fontSize: "0.8125rem", letterSpacing: "0.02em" }}
           />
@@ -123,8 +123,8 @@ function SuggestionsButton({
           aria-label="Suggested prompts"
           className={cn(
             "ml-2 flex size-8 shrink-0 items-center justify-center",
-            "text-amber-dim transition-colors duration-100",
-            "hover:text-mint",
+            "text-cream-dim transition-colors duration-100",
+            "hover:text-cyan",
           )}
         >
           <LightbulbIcon size={15} weight="fill" />
@@ -136,12 +136,12 @@ function SuggestionsButton({
           align="start"
           sideOffset={10}
           className={cn(
-            "z-50 w-96 border border-amber bg-background p-0 bloom-edge",
+            "z-50 w-96 border border-cream-hair bg-background p-0 bloom-edge",
             "data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
             "data-[state=open]:animate-in data-[state=open]:fade-in-0",
           )}
         >
-          <div className="border-b border-amber-hair px-3 py-2 hud-label">
+          <div className="border-b border-cream-hair px-3 py-2 hud-label">
             SUGGESTED PROMPTS
           </div>
           <ul className="flex flex-col">
@@ -152,9 +152,9 @@ function SuggestionsButton({
                   disabled={disabled}
                   onClick={() => onPick(s)}
                   className={cn(
-                    "w-full px-3 py-2 text-left text-amber",
+                    "w-full px-3 py-2 text-left text-cream",
                     "transition-colors duration-100",
-                    "hover:bg-amber/10 active:bg-amber/15",
+                    "hover:bg-cream/10 active:bg-cream/15",
                     "disabled:cursor-not-allowed disabled:opacity-50",
                   )}
                   style={{ fontSize: "0.75rem", letterSpacing: "0.02em" }}

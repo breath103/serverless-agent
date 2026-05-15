@@ -89,7 +89,7 @@ export function ModalShell({
 // ---------------------------------------------------------------------------
 export function ModalHeader({ className, title, onClose }: { className?: string; title: string; onClose: () => void }) {
   return (
-    <div className={cn("flex items-center justify-between border-b border-amber px-5 py-3", className)}>
+    <div className={cn("flex items-center justify-between border-b border-cream-hair px-5 py-3", className)}>
       <h2 className="hud-title" style={{ fontSize: "0.875rem" }}>{title}</h2>
       <button
         type="button"

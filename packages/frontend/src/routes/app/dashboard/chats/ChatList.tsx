@@ -30,7 +30,7 @@ export function ChatList() {
   const count = loading ? "…" : sessions.length;
 
   return (
-    <aside className="flex w-80 shrink-0 flex-col border-r border-amber bg-background">
+    <aside className="flex w-80 shrink-0 flex-col border-r border-cream-hair bg-background">
       <div className="hud-subheader px-5">
         <span className="hud-label">SESSIONS [{count}]</span>
       </div>
@@ -65,7 +65,7 @@ function ChatListSkeletons() {
   return (
     <div>
       {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="flex flex-col gap-1.5 border-b border-amber-hair px-5 py-3">
+        <div key={i} className="flex flex-col gap-1.5 border-b border-cream-hair px-5 py-3">
           <div className="flex items-center justify-between gap-2">
             <Skeleton className="h-3.5 min-w-0 flex-1" />
             <Skeleton className="h-3 w-12 shrink-0" />
@@ -92,7 +92,7 @@ function ChatListItem({
       to="/dashboard/chats/$chatId"
       params={{ chatId: session.id }}
       onContextMenu={onContextMenu}
-      className="block border-b border-amber-hair selectable-button-accent-1 px-5 py-3"
+      className="block border-b border-cream-hair selectable-button-accent-1 px-5 py-3"
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">

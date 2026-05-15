@@ -67,7 +67,7 @@ function CreateForm({
 
   return (
     <form onSubmit={(e) => { void onSubmit(e); }} className="flex flex-col">
-      <header className="flex items-center justify-between border-b border-amber px-5 pt-3 pb-2.5">
+      <header className="flex items-center justify-between border-b border-cream-hair px-5 pt-3 pb-2.5">
         <Dialog.Title asChild>
           <h2 className="hud-title" style={{ fontSize: "0.9375rem" }}>NEW MEMORY</h2>
         </Dialog.Title>
@@ -106,7 +106,7 @@ function CreateForm({
         )}
       </div>
 
-      <footer className="flex items-center justify-end gap-2 border-t border-amber px-5 py-3">
+      <footer className="flex items-center justify-end gap-2 border-t border-cream-hair px-5 py-3">
         <Button type="button" variant="default" onClick={onClose}>CANCEL</Button>
         <Button type="submit" variant="primary" loading={formState.isSubmitting} disabled={!formState.isValid}>
           CREATE

@@ -5,46 +5,73 @@
 @source "../../node_modules/@blocknote/shadcn/dist";
 
 /* =============================================================================
-   TERMINAL-HUD DESIGN SYSTEM
-   See documents/design-system/2026-04-26_terminal-hud-design-system.md
+   PHOSPHOR SPECTRUM DESIGN SYSTEM
+   See documents/design-system/2026-05-15_phosphor-spectrum-design-system.md
 
-   Black canvas, monospace, amber primary, mint operational, red failure.
-   Dark-only. No rounded corners. Phosphor bloom + scanlines + vignette
-   applied globally — no opt-in attribute, no per-page overrides.
+   Warm dark canvas, cream as default foreground. Five-channel palette
+   (cyan / magenta / coral / amber / mint) where each section "owns" a hue.
+   Status is role-locked (success = mint, warning = amber, error = red).
+   No rounded corners. Phosphor bloom + scanlines + vignette applied globally.
    ============================================================================= */
 
 :root {
-  /* ── Palette seeds ── */
-  --bg:           #000000;
-  --bg-elev:      #0a0a0a;
+  /* ── Canvas ── */
+  --bg:           #0E0A07;
+  --bg-elev:      #17110C;
 
-  --amber:        #ffb200;
-  --amber-dim:    #f0a820;   /* readable secondary on black — close to primary, used for captions/timestamps */
-  --amber-hair:   #5a3a00;   /* borders/dividers only */
+  /* ── Neutral foreground ── */
+  --cream:        #EFE4CF;
+  --cream-dim:    #A8997C;
+  --cream-hair:   #5C5440;
 
-  --mint:         #9decdb;
-  --mint-dim:     #7ec4b3;
+  /* ── Channel palette (each w/ full + dim + hair tier) ── */
+  --cyan:         #5BC8FF;
+  --cyan-dim:     #3A8FB8;
+  --cyan-hair:    #1B4257;
 
-  --red:          #ff3344;
-  --red-dim:      #a8202c;
+  --magenta:      #FF6FC8;
+  --magenta-dim: #B84A92;
+  --magenta-hair: #5C2347;
 
-  /* ── Semantic roles (names preserved from prior system for callsite compat) ── */
+  --coral:        #FF7A55;
+  --coral-dim:    #B85439;
+  --coral-hair:   #5C281B;
+
+  --amber:        #FFC93B;
+  --amber-dim:    #B8902A;
+  --amber-hair:   #5C4515;
+
+  --mint:         #6BE3A8;
+  --mint-dim:     #4AA37A;
+  --mint-hair:    #245040;
+
+  --red:          #FF4D5A;
+  --red-dim:      #B83540;
+  --red-hair:     #5C1A20;
+
+  /* ── Semantic roles ── (token names preserved from v1 so callsites still
+     compile; values are retuned to cream/channel/status — all references
+     to --text-1 etc. now render the new palette automatically). */
   --background:        var(--bg);
   --surface:           var(--bg);
   --surface-secondary: var(--bg-elev);
 
-  --text-1: var(--amber);
-  --text-2: var(--amber-dim);
-  --text-3: var(--amber-hair);
+  --text-1: var(--cream);
+  --text-2: var(--cream-dim);
+  --text-3: var(--cream-hair);
 
-  --border: var(--amber);
-  --muted:  color-mix(in oklch, var(--amber) 8%, transparent);
+  --border: var(--cream-hair);
+  --muted:  color-mix(in oklch, var(--cream) 6%, transparent);
 
   --error:   var(--red);
   --success: var(--mint);
+  --warning: var(--amber);
 
-  /* Accents collapse onto the three semantic hues. Legacy callsites keep working. */
-  --accent-1:    var(--amber);
+  /* Accent roles — accent-1 is the dominant CTA channel (cyan by default).
+     Routes can override --accent-1 locally to swap the section's primary
+     channel. accent-2 stays mint (operational / success). accent-3 stays
+     red (destructive). */
+  --accent-1:    var(--cyan);
   --accent-1-fg: var(--bg);
   --accent-2:    var(--mint);
   --accent-2-fg: var(--bg);
@@ -53,28 +80,27 @@
 
   --radius: 0;
 
-  /* Phosphor bloom — composes into text-shadow / box-shadow via currentColor.
-     Compose with var(--bloom-text) for text and var(--bloom-edge-shadow) for
-     borders, both inherit from currentColor automatically. */
+  /* Phosphor bloom — composes via currentColor. */
   --bloom-near: 0 0 0.5px currentColor;
-  --bloom-mid:  0 0 2px   color-mix(in oklch, currentColor 55%, transparent);
+  --bloom-mid:  0 0 2px   color-mix(in oklch, currentColor 50%, transparent);
   --bloom-far:  0 0 8px   color-mix(in oklch, currentColor 22%, transparent);
   --bloom-text: var(--bloom-near), var(--bloom-mid), var(--bloom-far);
   --bloom-edge-shadow: 0 0 0.5px currentColor,
                        0 0 6px color-mix(in oklch, currentColor 22%, transparent);
 
-  /* CRT effect knobs — change these to tune scanline / vignette intensity. */
-  --scanline-opacity: 0.1;   /* 0 disables; 0.10 subtle, 0.18 visible, 0.30 heavy */
-  --vignette-intensity: 0.2; /* 0 disables; 0.8 is heavy */
+  /* CRT effect knobs — tuned for warm canvas. */
+  --scanline-opacity: 0.07;
+  --vignette-intensity: 0.17;
 
-  /* Channel colors — collapsed to amber. Routes that surface "operational"
-     state per-channel can override per-element to mint/red as needed. */
-  --ch-phone:  var(--amber);
-  --ch-slack:  var(--amber);
-  --ch-gmail:  var(--amber);
-  --ch-notion: var(--amber);
+  /* Channel-routing alias slots — repointed per skill family. The values
+     point at the spectrum palette so existing callsites that referenced
+     --ch-* keep working. */
+  --ch-phone:  var(--cyan);
+  --ch-slack:  var(--magenta);
+  --ch-gmail:  var(--coral);
+  --ch-notion: var(--cream);
   --ch-zoom:   var(--amber);
-  --ch-linear: var(--amber);
+  --ch-linear: var(--mint);
 }
 
 /* sugar-high syntax highlighting — retuned to terminal palette. */
@@ -112,14 +138,34 @@
   --color-white: #fff;
   --color-black: #000;
 
-  /* Palette tokens, exposed as Tailwind utilities (text-amber, bg-mint, etc.) */
-  --color-amber:     var(--amber);
-  --color-amber-dim: var(--amber-dim);
+  /* Palette tokens, exposed as Tailwind utilities (text-cyan, bg-cream, etc.) */
+  --color-cream:      var(--cream);
+  --color-cream-dim:  var(--cream-dim);
+  --color-cream-hair: var(--cream-hair);
+
+  --color-cyan:       var(--cyan);
+  --color-cyan-dim:   var(--cyan-dim);
+  --color-cyan-hair:  var(--cyan-hair);
+
+  --color-magenta:      var(--magenta);
+  --color-magenta-dim:  var(--magenta-dim);
+  --color-magenta-hair: var(--magenta-hair);
+
+  --color-coral:      var(--coral);
+  --color-coral-dim:  var(--coral-dim);
+  --color-coral-hair: var(--coral-hair);
+
+  --color-amber:      var(--amber);
+  --color-amber-dim:  var(--amber-dim);
   --color-amber-hair: var(--amber-hair);
-  --color-mint:      var(--mint);
-  --color-mint-dim:  var(--mint-dim);
-  --color-red:       var(--red);
-  --color-red-dim:   var(--red-dim);
+
+  --color-mint:       var(--mint);
+  --color-mint-dim:   var(--mint-dim);
+  --color-mint-hair:  var(--mint-hair);
+
+  --color-red:        var(--red);
+  --color-red-dim:    var(--red-dim);
+  --color-red-hair:   var(--red-hair);
 
   /* Design tokens */
   --color-background:        var(--background);
@@ -221,7 +267,7 @@
   a, button { @apply cursor-pointer; }
 
   ::selection {
-    background: color-mix(in oklch, var(--amber) 35%, transparent);
+    background: color-mix(in oklch, var(--accent-1) 35%, transparent);
     color: var(--bg);
     text-shadow: none;
   }
@@ -251,39 +297,72 @@
   box-shadow: var(--bloom-edge-shadow);
 }
 
+/* Channel scope — set --accent-1 to the named channel so descendants
+   (buttons, hairlines, focus rings, selectable rows) all pick up that
+   color. Wrap a route or a sidebar item to swap its channel.
+   See documents/design-system/2026-05-15_phosphor-spectrum-design-system.md §3. */
+@utility channel-cyan {
+  --accent-1: var(--cyan);
+  --accent-1-dim: var(--cyan-dim);
+  --accent-1-hair: var(--cyan-hair);
+}
+@utility channel-magenta {
+  --accent-1: var(--magenta);
+  --accent-1-dim: var(--magenta-dim);
+  --accent-1-hair: var(--magenta-hair);
+}
+@utility channel-coral {
+  --accent-1: var(--coral);
+  --accent-1-dim: var(--coral-dim);
+  --accent-1-hair: var(--coral-hair);
+}
+@utility channel-amber {
+  --accent-1: var(--amber);
+  --accent-1-dim: var(--amber-dim);
+  --accent-1-hair: var(--amber-hair);
+}
+@utility channel-mint {
+  --accent-1: var(--mint);
+  --accent-1-dim: var(--mint-dim);
+  --accent-1-hair: var(--mint-hair);
+}
+@utility channel-cream {
+  --accent-1: var(--cream);
+  --accent-1-dim: var(--cream-dim);
+  --accent-1-hair: var(--cream-hair);
+}
+
 /* Type roles — match §3 of the design system spec. */
 @utility hud-eyebrow {
   font-size: 0.6875rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--amber);          /* full bright — hierarchy is size, not dimming */
+  color: var(--cream-dim);      /* eyebrows are tertiary chrome — dim cream, not loud */
   font-weight: 600;
 }
 @utility hud-label {
   font-size: 0.75rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--amber);          /* full bright */
+  color: var(--cream);          /* labels are full brightness cream */
   font-weight: 600;
 }
 @utility hud-caption {
   font-size: 0.6875rem;
   letter-spacing: 0.04em;
-  color: var(--amber-dim);      /* genuinely tertiary: timestamps, "x chars", axis labels */
+  color: var(--cream-dim);
 }
 @utility hud-title {
   font-size: 1.875rem;
-  line-height: 1;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  line-height: 1.1;
+  letter-spacing: 0;
   font-weight: 700;
   color: var(--text-1);
 }
 @utility hud-display {
   font-size: 2.75rem;
   line-height: 1;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  letter-spacing: 0;
   font-weight: 700;
   color: var(--text-1);
 }
@@ -298,34 +377,30 @@
 /* Containers — solid (data) vs dashed (action / outside data plane).
    No `background` here so callsites can pair with `bg-background` (modals)
    or rely on the parent background (panels embedded in a black page). */
+/* Panel — neutral elevated region defined by quiet cream-hair sides and
+   a channel-color top accent bar with phosphor halo. The channel hue is
+   set via --panel-channel (defaults to cyan, override per-section). */
 @utility hud-panel {
-  border: 1px solid var(--amber);
+  --panel-channel: var(--accent-1);
+  background: transparent;
+  border: 1px solid var(--cream-hair);
+  border-top: 2px solid var(--panel-channel);
   padding: 1.25rem;
   color: var(--text-1);
-  box-shadow: var(--bloom-edge-shadow);
+  box-shadow: 0 -1px 10px color-mix(in oklch, var(--panel-channel) 26%, transparent);
 }
 @utility hud-panel-op {
-  border-color: var(--mint);
-  color: var(--mint);
-  box-shadow:
-    0 0 0.5px var(--mint),
-    0 0 8px color-mix(in oklch, var(--mint) 24%, transparent);
+  --panel-channel: var(--mint);
 }
 @utility hud-panel-down {
-  border-color: var(--red);
-  color: var(--red);
-  box-shadow:
-    0 0 0.5px var(--red),
-    0 0 8px color-mix(in oklch, var(--red) 28%, transparent);
-}
-@utility hud-panel-action {
-  border-style: dashed;
+  --panel-channel: var(--red);
 }
 
-/* Hairline rule — the amber underline below page titles. */
+/* Hairline rule — the underline below page titles. Defaults to the
+   section's accent color so it follows channel routing. */
 @utility hud-rule {
   height: 1px;
-  background: var(--amber);
+  background: var(--accent-1);
   box-shadow: var(--bloom-edge-shadow);
 }
 
@@ -339,7 +414,7 @@
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  border-block: 1px solid var(--amber-hair);
+  border-block: 1px solid var(--cream-hair);
   background: var(--bg);
   padding-block: 0.5rem;
 }
@@ -476,15 +551,15 @@
   &:active { background-color: color-mix(in oklch, var(--error) 18%, transparent); }
 }
 
-/* Tag palette — kept by name. With a 3-color terminal palette, hue-rotation
-   from amber lands on weird off-spec colors. Collapsed to alternate between
-   amber / mint / red so legacy MultiSelect / tag UIs stay readable; routes
-   should migrate to explicit color choices. */
-@utility color-tag-0 { --base-color: var(--amber); }
-@utility color-tag-1 { --base-color: var(--mint); }
-@utility color-tag-2 { --base-color: var(--red); }
-@utility color-tag-3 { --base-color: var(--amber-dim); }
-@utility color-tag-4 { --base-color: var(--mint-dim); }
-@utility color-tag-5 { --base-color: var(--red-dim); }
-@utility color-tag-6 { --base-color: var(--amber); }
-@utility color-tag-7 { --base-color: var(--mint); }
+/* Tag palette — five-channel spectrum. Cycles through the channel hues
+   so MultiSelect / tag UIs read as distinct items, not as variations of
+   one color. Status hues (red, amber-as-warning) are intentionally left
+   out to keep them role-locked. */
+@utility color-tag-0 { --base-color: var(--cyan); }
+@utility color-tag-1 { --base-color: var(--magenta); }
+@utility color-tag-2 { --base-color: var(--amber); }
+@utility color-tag-3 { --base-color: var(--mint); }
+@utility color-tag-4 { --base-color: var(--coral); }
+@utility color-tag-5 { --base-color: var(--cyan-dim); }
+@utility color-tag-6 { --base-color: var(--magenta-dim); }
+@utility color-tag-7 { --base-color: var(--amber-dim); }

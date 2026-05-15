@@ -48,7 +48,7 @@ export function SkillsPage() {
   for (const row of installed.records) byId.set(row.data.skill_id, row);
 
   return (
-    <PageShell title="Skills">
+    <PageShell title="Skills" channel="amber">
       <div className="px-8 pb-10">
         {flash.connected && (
           <Banner kind="ok" text={`CONNECTED // ${flash.connected.toUpperCase()}`} />
@@ -69,10 +69,10 @@ function SkillCard({ skillId, row }: { skillId: InstallableSkillId; row: UserSki
   const settings = SKILLS[skillId];
 
   return (
-    <li className="flex items-center gap-4 border border-amber-hair p-4">
+    <li className="flex items-center gap-4 hud-panel">
       <img src={settings.iconUrl} alt="" width={32} height={32} className="shrink-0" />
       <div className="min-w-0 flex-1">
-        <div className="hud-label text-amber">{settings.displayName}</div>
+        <div className="hud-label" style={{ color: "var(--accent-1)" }}>{settings.displayName}</div>
         <div className="mt-0.5 text-[0.75rem] text-text-2">{settings.description}</div>
         {row && (
           <div className="mt-1 text-[0.6875rem] text-mint">

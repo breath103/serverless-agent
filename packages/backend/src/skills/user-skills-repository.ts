@@ -5,6 +5,7 @@ import {
   GetCommand,
   PutCommand,
   QueryCommand,
+  ScanCommand,
 } from "@aws-sdk/lib-dynamodb";
 
 import { ddb, tables } from "../lib/ddb.js";
@@ -33,6 +34,25 @@ export const userSkillsRepo = {
   async listForUser(userId: string): Promise<UserSkillRow[]> {
     const rows = await queryAllForUser(userId);
     rows.sort((a, b) => a.created_at.localeCompare(b.created_at));
+    return rows;
+  },
+
+  /**
+   * Scan the whole user_skills table. Used by the background-refresh worker
+   * (cron) to iterate every row across users. Low-volume demo — replace with
+   * a GSI lookup or a per-user fanout when cardinality matters.
+   */
+  async scanAll(): Promise<UserSkillRow[]> {
+    const rows: UserSkillRow[] = [];
+    let lastKey: DdbKey | undefined;
+    do {
+      const res = await ddb.get().send(new ScanCommand({
+        TableName: tables.userSkills(),
+        ExclusiveStartKey: lastKey,
+      }));
+      rows.push(...((res.Items ?? []) as UserSkillRow[]));
+      lastKey = res.LastEvaluatedKey as DdbKey | undefined;
+    } while (lastKey);
     return rows;
   },
 

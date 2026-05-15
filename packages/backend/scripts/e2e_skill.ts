@@ -21,6 +21,7 @@ import { loadConfig } from "shared/config";
 import { PutCommand } from "@aws-sdk/lib-dynamodb";
 
 import { ddb, tables } from "../src/lib/ddb.js";
+import { refreshAllUserSkills } from "../src/worker/refresh-user-skills.js";
 import { loadEnv } from "./lib/env.js";
 
 loadEnv("development");
@@ -105,7 +106,10 @@ async function main(): Promise<void> {
         config: {
           accessToken: "ya29.fake-access-token",
           refreshToken: "1//fake-refresh-token",
-          expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+          // Past expiry → refreshAllUserSkills() will actually attempt a
+          // refresh against Google (which fails on placeholder creds), so
+          // the worker's failure-counting path gets exercised.
+          expiresAt: new Date(Date.now() - 60 * 1000).toISOString(),
           email: "admin@example.invalid",
           name: "Admin Tester",
         },
@@ -120,6 +124,16 @@ async function main(): Promise<void> {
   const found = listed.find((r) => r.id === syntheticId);
   assert(found, `installed list missing synthetic row ${syntheticId}`);
   assert(found.data.skill_id === "google-calendar", "synthetic row has wrong skill_id");
+
+  // Exercise the cron worker in-process. Fake refresh_token + placeholder
+  // OAuth client guarantee the refresh call fails — we assert the worker
+  // counts the failure, doesn't throw, and leaves the row in place.
+  console.log("→ refreshAllUserSkills() — failing refresh should be logged + counted, row preserved");
+  const stats = await refreshAllUserSkills();
+  assert(stats.scanned >= 1, `worker should have scanned ≥1 row, got ${stats.scanned}`);
+  assert(stats.failed >= 1, `worker should have counted ≥1 failed refresh (fake refresh_token), got ${stats.failed}`);
+  const stillThere = await api<{ id: string }[]>(cookie, "/api/skills/installed");
+  assert(stillThere.some((r) => r.id === syntheticId), "row was deleted by refresh worker (should be preserved on failure)");
 
   console.log("→ DELETE /api/skills/:id");
   const uninstalled = await api<{ uninstalled: boolean }>(cookie, `/api/skills/${syntheticId}`, { method: "DELETE" });

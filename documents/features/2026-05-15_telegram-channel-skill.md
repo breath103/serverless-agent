@@ -198,10 +198,18 @@ Handler:
 4. Register the webhook with Telegram: `POST https://api.telegram.org/bot<token>/setWebhook { url: <edge>/api/telegram/webhook/<userId>/<userSkillId>, secret_token: webhook_secret, drop_pending_updates: true }`.
 5. `publishRealtimeEvent` for the row → frontend settings page reflects connect.
 
-Local dev: Telegram requires HTTPS, so `setWebhook` from `localhost:6001` will be rejected. Two carve-outs:
+Local dev: Telegram requires HTTPS, so `setWebhook` from `localhost:6001` is rejected. The install route skips `setWebhook` when `NODE_ENV === "development"` *unless* the user has set `EDGE_PUBLIC_URL` — in which case it registers the webhook against that host instead. Recommended setup for full real-Telegram testing locally:
 
-- **(a) Skip auto-`setWebhook` when `NODE_ENV === "development"`**, and log the URL the user should register manually via ngrok / cloudflare tunnel. The e2e harness simulates Telegram by hitting the local webhook URL directly — no real Telegram round-trip needed.
-- **(b)** A `./packages/backend/scripts/register_telegram_webhook.ts <userSkillId> <public_url>` helper so a user with a tunnel can register manually.
+```bash
+# in one terminal — gives a free, zero-signup HTTPS URL
+cloudflared tunnel --url http://localhost:6001
+# copy the printed URL into packages/backend/.env.development:
+EDGE_PUBLIC_URL=https://random-words.trycloudflare.com
+# restart dev server (env is read at startup)
+./scripts/dev.ts stop && ./scripts/dev.ts start
+```
+
+After that, installing a Telegram bot via the settings UI registers a real webhook with Telegram, messages reach the local backend through the tunnel, and assistant replies mirror back. The e2e harness still works without a tunnel — it simulates Telegram in-process.
 
 ### Uninstall — already wired
 

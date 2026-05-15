@@ -21,7 +21,7 @@ import type { AddressInfo } from "node:net";
 
 import { loadConfig } from "shared/config";
 
-import { dispatchTextToTelegram, resolveTelegramTargets } from "../src/channels/telegram-dispatcher.js";
+import { createTelegramDispatcher } from "../src/channels/telegram-dispatcher.js";
 import { ddbTables } from "../src/lib/ddb.js";
 import { taggedConfig } from "../src/skills/index.js";
 import { TELEGRAM_SECRET_HEADER, telegramDeleteWebhook, telegramGetMe, telegramSendMessage, telegramSetWebhook } from "../src/skills/telegram.js";
@@ -108,9 +108,8 @@ async function main(): Promise<void> {
     const setHook = mock.calls.find((c) => c.method === "setWebhook");
     assert(setHook?.body.secret_token === "secret-xyz", "setWebhook didn't pass secret_token");
     const sent = mock.calls.find((c) => c.method === "sendMessage");
-    assert(sent?.body.parse_mode === "MarkdownV2", "sendMessage didn't request MarkdownV2");
-    const sentText = sent.body.text as string;
-    assert(sentText.includes("\\*"), `sendMessage didn't escape MarkdownV2: ${sentText}`);
+    assert(sent?.body.text === "hello *world*", `sendMessage didn't pass through plain text: ${String(sent?.body.text)}`);
+    assert(sent.body.parse_mode === undefined, `sendMessage should not request parse_mode, got ${String(sent.body.parse_mode)}`);
 
     console.log("→ sign in as admin");
     const cookie = await loginAsUser(BASE, "admin", "admin");
@@ -209,15 +208,23 @@ async function main(): Promise<void> {
 
     console.log("→ outbound dispatcher: fires sendMessage at the bound chat");
     const callsBefore = mock.calls.filter((c) => c.method === "sendMessage").length;
-    const targets = await resolveTelegramTargets({ userId, sessionId });
-    assert(targets.length === 1 && targets[0].telegram_chat_id === "555", `wrong targets: ${JSON.stringify(targets)}`);
-    await dispatchTextToTelegram(targets, "reply from agent");
+    const dispatch = createTelegramDispatcher({ userId, sessionId });
+    await dispatch("reply from agent");
     const callsAfter = mock.calls.filter((c) => c.method === "sendMessage").length;
     assert(callsAfter === callsBefore + 1, `dispatcher should have sent 1 message, sent ${callsAfter - callsBefore}`);
+    const lastSend = mock.calls.filter((c) => c.method === "sendMessage").at(-1);
+    assert(lastSend?.body.chat_id === "555", `dispatcher used wrong chat_id: ${String(lastSend?.body.chat_id)}`);
+    // Lazy cache check — a second call shouldn't trigger a fresh DDB read but
+    // should still send. We can't observe the DDB read count from here, but
+    // we can at least confirm both sends land.
+    await dispatch("another reply");
+    assert(mock.calls.filter((c) => c.method === "sendMessage").length === callsAfter + 1, "second dispatch didn't land");
 
     console.log("→ outbound dispatcher: unrelated session → no send");
-    const noneTargets = await resolveTelegramTargets({ userId, sessionId: randomUUID() });
-    assert(noneTargets.length === 0, "resolveTelegramTargets should return [] for unbound session");
+    const beforeNoSend = mock.calls.filter((c) => c.method === "sendMessage").length;
+    const noneDispatch = createTelegramDispatcher({ userId, sessionId: randomUUID() });
+    await noneDispatch("should not fire");
+    assert(mock.calls.filter((c) => c.method === "sendMessage").length === beforeNoSend, "dispatcher fired for unbound session");
 
     // Note: the DELETE handler runs inside the dev-backend process, which
     // doesn't inherit our TELEGRAM_BOT_API_BASE override — the real
@@ -237,13 +244,11 @@ async function main(): Promise<void> {
 }
 
 async function waitForIdle(opts: { cookie: string; sessionId: string; ms: number }): Promise<void> {
-  const deadline = Date.now() + opts.ms;
-  while (Date.now() < deadline) {
+  await waitFor(async () => {
     const res = await fetch(`${BASE}/api/chat/${opts.sessionId}`, { headers: { Cookie: opts.cookie } });
     const row = await res.json() as { is_generating: boolean };
-    if (!row.is_generating) return;
-    await new Promise((r) => setTimeout(r, 200));
-  }
+    return !row.is_generating;
+  }, opts.ms).catch(() => {});
 }
 
 main().catch((err) => {

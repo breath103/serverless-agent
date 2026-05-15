@@ -1,11 +1,9 @@
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
-import { generateChatTitleInBackground } from "../../agent-runtime/generate-chat-title.js";
-import { runChatInBackground } from "../../agent-runtime/start-chat-session.js";
-import { chatSessionsRepo } from "../../chat-sessions/chat-sessions-repository.js";
+import { beginGenerating } from "../../agent-runtime/index.js";
+import { runChatInBackground, startChatSession } from "../../agent-runtime/start-chat-session.js";
 import { route } from "../../lib/app-context.js";
-import { publishRealtimeEvent } from "../../lib/realtime-publish.js";
 import { taggedConfig } from "../../skills/index.js";
 import { TELEGRAM_SECRET_HEADER } from "../../skills/telegram.js";
 import { userSkillsRepo } from "../../skills/user-skills-repository.js";
@@ -77,28 +75,24 @@ export const routes = [
       const existingSessionId = row.data.config.chat_session_id;
 
       if (existingSessionId === null) {
-        // First inbound: write the skill-row binding BEFORE spawning the chat
-        // loop. `runChatTurn` reads `telegramTargets` at the top of the turn
-        // (before the LLM call) — if the binding lands after that read, the
-        // outbound dispatcher silently no-ops on this turn's reply.
-        const session = await chatSessionsRepo.createGenerating(userId, "user");
+        // First inbound: spawn the standard chat-session lifecycle, then write
+        // the binding onto the skill row. The outbound dispatcher is lazy
+        // (resolves on first assistant text), so updateData has plenty of
+        // time to land before any reply gets generated.
+        const { sessionId } = await startChatSession({ userId, kind: "user", userMessageText });
         await userSkillsRepo.updateData(userId, row.id, taggedConfig("telegram", {
           ...row.data.config,
           telegram_chat_id: msg.chat.id,
-          chat_session_id: session.id,
+          chat_session_id: sessionId,
         }));
-        await publishRealtimeEvent(userId, { type: "entity_update", table: "chat_sessions", op: "upsert", row: session });
-        runChatInBackground({ userId, sessionId: session.id, userMessageText });
-        void generateChatTitleInBackground({ userId, sessionId: session.id, userMessageText });
         return { ok: true };
       }
 
-      const session = await chatSessionsRepo.beginGenerating(userId, existingSessionId);
+      const session = await beginGenerating(existingSessionId, userId);
       if (!session) {
         console.warn(`[telegram-webhook] user=${userId} session=${existingSessionId} busy; dropped inbound`);
         return { ok: true };
       }
-      await publishRealtimeEvent(userId, { type: "entity_update", table: "chat_sessions", op: "upsert", row: session });
       runChatInBackground({ userId, sessionId: session.id, userMessageText });
       return { ok: true };
     },

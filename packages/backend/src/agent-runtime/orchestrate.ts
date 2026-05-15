@@ -1,4 +1,4 @@
-import { dispatchTextToTelegram, resolveTelegramTargets, type TelegramTarget } from "../channels/telegram-dispatcher.js";
+import { createTelegramDispatcher } from "../channels/telegram-dispatcher.js";
 import { chatSessionsRepo } from "../chat-sessions/chat-sessions-repository.js";
 import type { ChatSessionMessageData } from "../lib/realtime-events.js";
 import { publishRealtimeEvent } from "../lib/realtime-publish.js";
@@ -50,9 +50,9 @@ export async function runChatTurn(opts: {
   const history: LlmMessage[] = rowsToLlmMessages(initialRows);
   annotateLastUserMessageWithTime(history, profile?.timezone);
 
-  // Resolve channel targets once per turn — the binding doesn't change mid-turn
-  // and a per-text-block lookup would be N redundant queries.
-  const telegramTargets = await resolveTelegramTargets({ userId, sessionId });
+  // Lazy — resolves on first assistant text, after any inbound-webhook
+  // binding-write has completed. One DDB read per turn, max.
+  const sendToTelegram = createTelegramDispatcher({ userId, sessionId });
 
   try {
     for (let step = 0; step < MAX_TURN_STEPS; step += 1) {
@@ -63,7 +63,7 @@ export async function runChatTurn(opts: {
       });
 
       for (const block of message.content) {
-        await persistAssistantBlock({ userId, sessionId, block, telegramTargets });
+        await persistAssistantBlock({ userId, sessionId, block, sendToTelegram });
       }
       history.push({ role: "assistant", content: message.content });
 
@@ -129,9 +129,9 @@ async function persistAssistantBlock(opts: {
   userId: string;
   sessionId: string;
   block: LlmAssistantContentBlock;
-  telegramTargets: TelegramTarget[];
+  sendToTelegram: (text: string) => Promise<void>;
 }): Promise<void> {
-  const { userId, sessionId, block, telegramTargets } = opts;
+  const { userId, sessionId, block, sendToTelegram } = opts;
 
   switch (block.type) {
     case "text": {
@@ -141,7 +141,7 @@ async function persistAssistantBlock(opts: {
         data: { role: "assistant", content: { kind: "text", text: block.text } },
       });
       // Only `text` mirrors out — tool_use/tool_result are agent internals.
-      await dispatchTextToTelegram(telegramTargets, block.text);
+      await sendToTelegram(block.text);
       break;
     }
     case "tool_use": {

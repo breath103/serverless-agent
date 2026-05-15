@@ -1,14 +1,13 @@
 import { telegramSendMessage } from "../skills/telegram.js";
 import { userSkillsRepo } from "../skills/user-skills-repository.js";
 
-export interface TelegramTarget {
+interface TelegramTarget {
   skillRowId: string;
   bot_token: string;
   telegram_chat_id: string;
 }
 
-/** Call once per chat turn — the binding doesn't change mid-turn. */
-export async function resolveTelegramTargets(opts: { userId: string; sessionId: string }): Promise<TelegramTarget[]> {
+async function resolveTelegramTargets(opts: { userId: string; sessionId: string }): Promise<TelegramTarget[]> {
   const rows = await userSkillsRepo.listForUser(opts.userId);
   const targets: TelegramTarget[] = [];
   for (const row of rows) {
@@ -20,15 +19,24 @@ export async function resolveTelegramTargets(opts: { userId: string; sessionId: 
   return targets;
 }
 
-/** Per-target failures are swallowed — web-UI already delivered; a broken bot mustn't crash the turn. */
-export async function dispatchTextToTelegram(targets: TelegramTarget[], text: string): Promise<void> {
-  for (const t of targets) {
-    try {
-      await telegramSendMessage(t.bot_token, t.telegram_chat_id, text);
-    } catch (err) {
-      console.error(
-        `[telegram-dispatcher] skill=${t.skillRowId}: ${err instanceof Error ? err.message : String(err)}`,
-      );
+/**
+ * Build a per-turn dispatcher. Resolves bound Telegram targets lazily on
+ * first call and caches them — DDB read happens at most once per turn,
+ * after the inbound webhook has had time to write the binding (no race).
+ * Per-target send failures are swallowed (web-UI already delivered).
+ */
+export function createTelegramDispatcher(opts: { userId: string; sessionId: string }): (text: string) => Promise<void> {
+  let targets: TelegramTarget[] | null = null;
+  return async (text: string) => {
+    targets ??= await resolveTelegramTargets(opts);
+    for (const t of targets) {
+      try {
+        await telegramSendMessage(t.bot_token, t.telegram_chat_id, text);
+      } catch (err) {
+        console.error(
+          `[telegram-dispatcher] skill=${t.skillRowId}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     }
-  }
+  };
 }

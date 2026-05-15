@@ -55,32 +55,8 @@ export async function telegramDeleteWebhook(token: string): Promise<void> {
   await callTelegram(token, "deleteWebhook", { drop_pending_updates: true }, z.boolean());
 }
 
-/**
- * Send a message back to Telegram. Tries MarkdownV2 first; on 400 retries
- * once with plain text — we lose formatting but never drop the delivery
- * because of a stray underscore in the assistant's reply.
- */
 export async function telegramSendMessage(token: string, chatId: string, text: string): Promise<void> {
-  try {
-    await callTelegram(token, "sendMessage", {
-      chat_id: chatId,
-      text: escapeMarkdownV2(text),
-      parse_mode: "MarkdownV2",
-    }, z.object({}).passthrough());
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (!msg.includes("can't parse entities") && !msg.includes("parse")) throw err;
-    await callTelegram(token, "sendMessage", { chat_id: chatId, text }, z.object({}).passthrough());
-  }
-}
-
-// Telegram's MarkdownV2 requires escaping these characters everywhere they
-// don't open/close a formatting marker. The simplest correct approach is to
-// escape them all unconditionally — the rendered text reads identically
-// (Telegram strips the backslashes for display) and we never 400.
-const MD_V2_SPECIALS = /([_*[\]()~`>#+\-=|{}.!\\])/g;
-function escapeMarkdownV2(text: string): string {
-  return text.replace(MD_V2_SPECIALS, "\\$1");
+  await callTelegram(token, "sendMessage", { chat_id: chatId, text }, z.object({}).passthrough());
 }
 
 export const telegram = defineSkill({

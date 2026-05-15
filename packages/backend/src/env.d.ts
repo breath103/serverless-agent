@@ -24,6 +24,16 @@ declare namespace NodeJS {
     // Optional: local DynamoDB endpoint (when set, ddb client points here with dummy creds)
     DDB_LOCAL_ENDPOINT: string | undefined;
 
+    // Optional Telegram Bot API base URL (defaults to https://api.telegram.org).
+    // Override in tests/local-mock setups.
+    TELEGRAM_BOT_API_BASE: string | undefined;
+
+    // Optional public HTTPS URL for the edge proxy (e.g. a cloudflared tunnel).
+    // When set, the Telegram install route registers webhooks against this host
+    // instead of the request's edge URL — required for end-to-end testing
+    // against real Telegram from a local dev machine.
+    EDGE_PUBLIC_URL: string | undefined;
+
     // AWS Lambda runtime region (provided by AWS).
     AWS_REGION: string;
 

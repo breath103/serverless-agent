@@ -24,10 +24,12 @@ export async function refreshAndPersist(
   // (telegram) have no token lifecycle and stay as-is.
   if (handler.install.type !== "oauth2") return { config: row.data.config, rotated: false };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument -- skill_id ↔ config correlation enforced by InstallableSkillConfig discriminator
-  const refreshed = await handler.install.refreshConfig(row.data.config as any);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access -- same correlation
-  if (refreshed.expiresAt === (row.data.config as any).expiresAt) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- skill_id ↔ config correlation enforced by InstallableSkillConfig discriminator
+  const config: any = row.data.config;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- same correlation
+  const refreshed = await handler.install.refreshConfig(config);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- same correlation
+  if (refreshed.expiresAt === config.expiresAt) {
     return { config: refreshed, rotated: false };
   }
 

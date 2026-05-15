@@ -105,13 +105,16 @@ export const routes = [
         },
       });
 
-      if (process.env.NODE_ENV !== "development") {
+      // In dev, Telegram won't call localhost — so we only register the
+      // webhook if either we're not in dev, OR the user has set up a tunnel
+      // and exposed it via EDGE_PUBLIC_URL (e.g. cloudflared --url http://localhost:6001).
+      const publicHost = process.env.EDGE_PUBLIC_URL;
+      const shouldRegister = process.env.NODE_ENV !== "development" || publicHost !== undefined;
+      if (shouldRegister) {
+        const webhookPath = `/api/telegram/webhook/${user.id}/${row.id}`;
+        const webhookUrl = publicHost ? `${publicHost}${webhookPath}` : edgeUrl(c, webhookPath);
         try {
-          await telegramSetWebhook(
-            body.botToken,
-            edgeUrl(c, `/api/telegram/webhook/${user.id}/${row.id}`),
-            webhook_secret,
-          );
+          await telegramSetWebhook(body.botToken, webhookUrl, webhook_secret);
         } catch (err) {
           await userSkillsRepo.deleteForUser(user.id, row.id);
           const msg = err instanceof Error ? err.message : String(err);

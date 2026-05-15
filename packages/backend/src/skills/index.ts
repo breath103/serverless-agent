@@ -37,8 +37,7 @@ type InstallTypeFilteredSkillMap<Type extends string> = {
 
 /** @public — required from frontend */
 export type Oauth2InstallSkillMap = InstallTypeFilteredSkillMap<"oauth2">;
-/** @public — required from frontend */
-export type TelegramInstallSkillMap = InstallTypeFilteredSkillMap<"telegram">;
+type TelegramInstallSkillMap = InstallTypeFilteredSkillMap<"telegram">;
 
 /** @public — required from frontend */
 export type InstallableSkillId = keyof Oauth2InstallSkillMap | keyof TelegramInstallSkillMap;

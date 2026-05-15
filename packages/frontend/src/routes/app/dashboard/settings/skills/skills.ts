@@ -7,7 +7,6 @@ export interface SkillDisplaySettings<TId extends InstallableSkillId> {
   readonly displayName: string;
   readonly description: string;
   readonly iconUrl: string;
-  readonly permissions: readonly string[];
   /** Pull the user-facing account label out of the persisted config. */
   readonly buildAccountLabel: (config: SkillConfigMap[TId]) => string;
 }
@@ -19,7 +18,6 @@ export const SKILLS: SkillsMap = {
     displayName: "Google Calendar",
     description: "List, create, update, and delete Google Calendar events",
     iconUrl: googleCalendarIcon,
-    permissions: ["Read events", "Create events", "Modify events"],
     buildAccountLabel: (config) => config.email,
   },
 };

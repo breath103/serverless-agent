@@ -45,4 +45,5 @@ Rule: **don't push until both jobs are green locally**. If it passes locally and
 
 ## Demo constraints
 
+- No custom domain. The frontend is served from the default CloudFront `*.cloudfront.net` hostname; there is no Route53 stack.
 - No third-party OAuth integrations, no billable-usage tracking, no radar feature. The agent has two skills: `memory` and `web-search` (Tavily).

@@ -40,3 +40,16 @@ export type InstallableSkillId = keyof Oauth2InstallSkillMap;
 export type InstallableSkillConfig = {
   [K in InstallableSkillId]: { skill_id: K; config: z.infer<Oauth2InstallSkillMap[K]["configSchema"]> }
 }[InstallableSkillId];
+
+/**
+ * Build a tagged `InstallableSkillConfig` variant. Necessary because TS can't
+ * pair the `skill_id` discriminator with the corresponding `config` shape
+ * across a union of map keys — the cast is sound because callers always
+ * supply the matching pair (statically narrowed at the call site).
+ */
+export function taggedConfig(
+  skillId: InstallableSkillId,
+  config: InstallableSkillConfig["config"],
+): InstallableSkillConfig {
+  return { skill_id: skillId, config } as InstallableSkillConfig;
+}

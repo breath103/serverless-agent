@@ -1,7 +1,7 @@
 import { publishRealtimeEvent } from "../lib/realtime-publish.js";
 import type { UserSkillRow } from "../types/database.js";
 import type { InstallableSkillConfig } from "./index.js";
-import { skillHandlers } from "./index.js";
+import { skillHandlers, taggedConfig } from "./index.js";
 import { userSkillsRepo } from "./user-skills-repository.js";
 
 /**
@@ -28,7 +28,7 @@ export async function refreshAndPersist(
   const updated = await userSkillsRepo.updateData(
     row.user_id,
     row.id,
-    { skill_id: row.data.skill_id, config: refreshed } as InstallableSkillConfig,
+    taggedConfig(row.data.skill_id, refreshed),
   );
   if (updated) {
     await publishRealtimeEvent(row.user_id, {

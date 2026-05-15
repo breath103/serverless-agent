@@ -11,6 +11,7 @@ import {
 import { ddb, tables } from "../lib/ddb.js";
 import type { UserSkillRow } from "../types/database.js";
 import type { InstallableSkillConfig, InstallableSkillId } from "./index.js";
+import { taggedConfig } from "./index.js";
 
 type DdbKey = Record<string, string>;
 
@@ -81,7 +82,7 @@ export const userSkillsRepo = {
     const row: UserSkillRow = {
       user_id: opts.userId,
       id: existing?.id ?? randomUUID(),
-      data: { skill_id: opts.skillId, config: opts.config } as InstallableSkillConfig,
+      data: taggedConfig(opts.skillId, opts.config),
       created_at: existing?.created_at ?? now,
       updated_at: now,
     };

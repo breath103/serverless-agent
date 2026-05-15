@@ -24,7 +24,7 @@ export async function refreshAllUserSkills(): Promise<{ scanned: number; refresh
     } catch (err) {
       failed++;
       console.error(
-        `[refresh-user-skills] user=${row.user_id} skill=${row.data.skill_id} id=${row.id}: ${err instanceof Error ? err.message : String(err)}`,
+        `[refresh-user-skills] skill=${row.data.skill_id} user=${row.user_id} id=${row.id}: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
   }

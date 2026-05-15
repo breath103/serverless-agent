@@ -92,7 +92,7 @@ export const routes = [
       const handler = requireOauth2Handler(row.data.skill_id);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument -- skill_id ↔ config correlation enforced by InstallableSkillConfig discriminator
       await handler.install.uninstall(row.data.config as any).catch((err) => {
-        console.warn(`[uninstall] ${row.data.skill_id} for user=${user.id}: ${err instanceof Error ? err.message : String(err)}`);
+        console.warn(`[uninstall] skill=${row.data.skill_id} user=${user.id} id=${row.id}: ${err instanceof Error ? err.message : String(err)}`);
       });
 
       const deleted = await userSkillsRepo.deleteForUser(user.id, params.id);

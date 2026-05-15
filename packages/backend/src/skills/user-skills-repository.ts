@@ -8,15 +8,8 @@ import { taggedConfig } from "./index.js";
 class UserSkillsRepository {
   constructor(private readonly table: DdbTable<UserSkillRow, { user_id: string; id: string }>) {}
 
-  private allForUser(userId: string): Promise<UserSkillRow[]> {
-    return this.table.queryAll({
-      keyConditionExpression: "user_id = :u",
-      expressionAttributeValues: { ":u": userId },
-    });
-  }
-
   async listForUser(userId: string): Promise<UserSkillRow[]> {
-    const rows = await this.allForUser(userId);
+    const rows = await this.table.queryByPartitionKey("user_id", userId);
     rows.sort((a, b) => a.created_at.localeCompare(b.created_at));
     return rows;
   }
@@ -40,7 +33,7 @@ class UserSkillsRepository {
     skillId: InstallableSkillId;
     config: InstallableSkillConfig["config"];
   }): Promise<UserSkillRow> {
-    const all = await this.allForUser(opts.userId);
+    const all = await this.table.queryByPartitionKey("user_id", opts.userId);
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- single installable variant today; comparison becomes meaningful on a 2nd skill
     const existing = all.find((r) => r.data.skill_id === opts.skillId) ?? null;
     const now = new Date().toISOString();
@@ -55,20 +48,18 @@ class UserSkillsRepository {
     return row;
   }
 
-  async updateData(
+  updateData(
     userId: string,
     id: string,
     data: InstallableSkillConfig,
   ): Promise<UserSkillRow | null> {
-    const existing = await this.getByIdForUser(userId, id);
-    if (!existing) return null;
-    const updated: UserSkillRow = {
-      ...existing,
-      data,
-      updated_at: new Date().toISOString(),
-    };
-    await this.table.put(updated);
-    return updated;
+    return this.table.updateIf({
+      key: { user_id: userId, id },
+      updateExpression: "SET #d = :d, updated_at = :u",
+      conditionExpression: "attribute_exists(id)",
+      expressionAttributeNames: { "#d": "data" },
+      expressionAttributeValues: { ":d": data, ":u": new Date().toISOString() },
+    });
   }
 
   deleteForUser(userId: string, id: string): Promise<UserSkillRow | null> {

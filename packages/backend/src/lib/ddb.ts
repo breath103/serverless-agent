@@ -125,6 +125,14 @@ export class DdbTable<TRow, TKey extends DdbKey> {
     }
   }
 
+  /** Paginated query for every row under a single partition key — shortcut over `queryAll`. */
+  queryByPartitionKey(name: keyof TKey & string, value: string | number): Promise<TRow[]> {
+    return this.queryAll({
+      keyConditionExpression: `${name} = :pk`,
+      expressionAttributeValues: { ":pk": value },
+    });
+  }
+
   /** Paginated query — collects every matching row across all pages. */
   async queryAll(opts: {
     keyConditionExpression: string;

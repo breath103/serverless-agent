@@ -11,10 +11,7 @@ class ChatSessionsRepository {
   ) {}
 
   async listForUser(userId: string): Promise<ChatSessionRow[]> {
-    const rows = await this.sessions.queryAll({
-      keyConditionExpression: "user_id = :u",
-      expressionAttributeValues: { ":u": userId },
-    });
+    const rows = await this.sessions.queryByPartitionKey("user_id", userId);
     rows.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
     return rows;
   }
@@ -88,20 +85,8 @@ class ChatSessionsRepository {
   }
 
   listMessagesAsc(sessionId: string): Promise<ChatSessionMessageRow[]> {
-    return this.messages.queryAll({
-      keyConditionExpression: "session_id = :s",
-      expressionAttributeValues: { ":s": sessionId },
-      // PK=session_id, SK=created_at_id — SK is ISO-prefixed so natural
-      // ascending scan order is chronological.
-      scanIndexForward: true,
-    });
-  }
-
-  async listMessageDataAsc(
-    sessionId: string,
-  ): Promise<Pick<ChatSessionMessageRow, "data">[]> {
-    const rows = await this.listMessagesAsc(sessionId);
-    return rows.map((r) => ({ data: r.data }));
+    // SK `created_at_id` is ISO-prefixed → default ascending Query order is chronological.
+    return this.messages.queryByPartitionKey("session_id", sessionId);
   }
 
   async insertMessage(

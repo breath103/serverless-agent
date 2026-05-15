@@ -12,16 +12,9 @@ import type {
 class MemoriesRepository {
   constructor(private readonly table: DdbTable<Memory, { user_id: string; id: string }>) {}
 
-  private allForUser(userId: string): Promise<Memory[]> {
-    return this.table.queryAll({
-      keyConditionExpression: "user_id = :u",
-      expressionAttributeValues: { ":u": userId },
-    });
-  }
-
   async list(userId: string, opts?: { limit?: number; before?: string }): Promise<Memory[]> {
     const limit = Math.min(opts?.limit ?? 50, 100);
-    const all = await this.allForUser(userId);
+    const all = await this.table.queryByPartitionKey("user_id", userId);
     const filtered = opts?.before ? all.filter((r) => r.created_at < opts.before!) : all;
     filtered.sort((a, b) => b.created_at.localeCompare(a.created_at));
     return filtered.slice(0, limit);
@@ -34,7 +27,7 @@ class MemoriesRepository {
   async getByIds(userId: string, ids: string[]): Promise<Memory[]> {
     if (ids.length === 0) return [];
     const idSet = new Set(ids);
-    const all = await this.allForUser(userId);
+    const all = await this.table.queryByPartitionKey("user_id", userId);
     return all.filter((r) => idSet.has(r.id));
   }
 
@@ -73,7 +66,7 @@ class MemoriesRepository {
     const cappedLimit = Math.min(limit, 100);
     const needle = query.trim().toLowerCase();
     if (!needle) return [];
-    const all = await this.allForUser(userId);
+    const all = await this.table.queryByPartitionKey("user_id", userId);
     const matches: MemorySearchMatch[] = [];
     for (const r of all) {
       const haystack = `${r.title}\n${markdownToText(r.content)}`.toLowerCase();

@@ -269,6 +269,7 @@ async function main(): Promise<void> {
 
     console.log("\n✅ e2e_telegram passed");
   } finally {
+    delete process.env.TELEGRAM_BOT_API_BASE;
     mock.server.close();
   }
 }

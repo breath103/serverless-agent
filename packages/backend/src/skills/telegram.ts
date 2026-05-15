@@ -11,7 +11,6 @@ const TelegramSkillConfigSchema = z.object({
 });
 type TelegramSkillConfig = z.infer<typeof TelegramSkillConfigSchema>;
 
-/** Header name Telegram uses for our webhook secret. Shared with the webhook route + e2e. */
 export const TELEGRAM_SECRET_HEADER = "x-telegram-bot-api-secret-token";
 
 function baseUrl(token: string): string {
@@ -55,13 +54,6 @@ export async function telegramDeleteWebhook(token: string): Promise<void> {
   await callTelegram(token, "deleteWebhook", { drop_pending_updates: true }, z.boolean());
 }
 
-/**
- * Send a message to a Telegram chat. The agent emits Markdown; Telegram only
- * renders MarkdownV2 (finicky) or a small HTML subset. We convert to that HTML
- * subset and try `parse_mode: "HTML"`; if Telegram rejects (parse error), we
- * fall back to the raw text without `parse_mode` so the user still sees the
- * content, just unformatted.
- */
 export async function telegramSendMessage(token: string, chatId: string, text: string): Promise<void> {
   try {
     await callTelegram(token, "sendMessage", {
@@ -76,46 +68,31 @@ export async function telegramSendMessage(token: string, chatId: string, text: s
   }
 }
 
-/**
- * Convert agent-emitted Markdown to Telegram's tiny HTML subset:
- * <b>, <i>, <u>, <s>, <code>, <pre>, <a href>. Tables get flattened to
- * `·`-separated cells. Headers collapse to <b>. Lists keep their leading
- * bullet/number as plain text. Anything else passes through with HTML
- * specials (`&`, `<`, `>`) escaped — otherwise an LLM-emitted `<x>` would
- * be parsed by Telegram as a (broken) tag.
- */
+/** Markdown → Telegram HTML subset. `<>&` escaped first so LLM-emitted angle brackets don't parse as tags. Tables flatten; Telegram has no table support. */
 function markdownToTelegramHtml(md: string): string {
   let html = md.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-  // Table separator row, e.g. `|---|---|`. Drop entirely.
   html = html.replace(/^\s*\|\s*[-:]+(\s*\|\s*[-:]+)*\s*\|\s*$/gm, "");
-  // Remaining `| a | b | c |` rows → "a · b · c".
   html = html.replace(/^\s*\|(.+)\|\s*$/gm, (_, inner: string) =>
     inner.split("|").map((c) => c.trim()).filter((c) => c.length > 0).join(" · "),
   );
 
-  // Fenced code → <pre>…</pre>. Strip a language tag if present.
   html = html.replace(/```(?:[a-zA-Z0-9_-]+)?\n?([\s\S]*?)```/g, (_, body: string) => `<pre>${body.replace(/\n$/, "")}</pre>`);
-  // Inline code → <code>…</code>.
   html = html.replace(/`([^`\n]+)`/g, "<code>$1</code>");
 
-  // Bold first, then italic — order matters so `**` is consumed before `*`.
+  // Bold before italic — otherwise the italic regex eats one `*` from each `**`.
   html = html.replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>");
   html = html.replace(/__([^_\n]+)__/g, "<b>$1</b>");
   html = html.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<i>$2</i>");
   html = html.replace(/(^|[^_\w])_([^_\n]+)_(?!\w)/g, "$1<i>$2</i>");
   html = html.replace(/~~([^~\n]+)~~/g, "<s>$1</s>");
 
-  // Links — escape the URL's `"` to avoid breaking the href attribute.
   html = html.replace(/\[([^\]\n]+)\]\(([^)\n]+)\)/g, (_, label: string, href: string) =>
     `<a href="${href.replace(/"/g, "&quot;")}">${label}</a>`,
   );
 
-  // Headers → bold + newline.
   html = html.replace(/^\s{0,3}#{1,6}\s+(.+)$/gm, "<b>$1</b>");
-  // Horizontal rules → a divider character.
   html = html.replace(/^\s{0,3}[-*_]{3,}\s*$/gm, "—");
-  // Bullet list markers → "• ".
   html = html.replace(/^(\s*)[-*+]\s+/gm, "$1• ");
 
   return html;

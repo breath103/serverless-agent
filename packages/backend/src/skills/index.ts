@@ -6,14 +6,9 @@ import { googleCalendar } from "./google.js";
 import { telegram } from "./telegram.js";
 
 export const skillHandlers = {
-  // Builtins
   [memory.id]: memory,
   [webSearch.id]: webSearch,
-
-  // Installable — Google (oauth2)
   [googleCalendar.id]: googleCalendar,
-
-  // Installable — Telegram (channel, token-based)
   [telegram.id]: telegram,
 } as const;
 

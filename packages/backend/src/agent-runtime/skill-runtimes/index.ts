@@ -19,9 +19,7 @@ export function loadSkill(
     case "google-calendar":
       return googleCalendar.create(instanceId, skill.config, undefined);
     case "telegram":
-      // Channel-style skills are filtered out by `buildSkills` before this
-      // is reached. If we get here, that filter is broken — fail loudly
-      // rather than silently exposing a telegram binding to the LLM.
-      throw new Error("loadSkill: telegram is a channel skill and must be filtered before binding");
+      // Channel skills are filtered out before loadSkill — reaching here means buildSkills is broken.
+      throw new Error("loadSkill: telegram is a channel skill, must be filtered before binding");
   }
 }

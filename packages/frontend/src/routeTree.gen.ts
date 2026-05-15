@@ -10,6 +10,7 @@ import { memoryDetailRoute } from "./routes/app/dashboard/memories/$memoryId/_ro
 import { dashboardSettingsRoute } from "./routes/app/dashboard/settings/_route";
 import { profileRoute } from "./routes/app/dashboard/settings/profile/_route";
 import { skillsRoute } from "./routes/app/dashboard/settings/skills/_route";
+import { designRoute } from "./routes/design/_route";
 import { designCheckRoute } from "./routes/design-check/_route";
 import { loginRoute } from "./routes/login/_route";
 
@@ -17,6 +18,7 @@ export const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
   designCheckRoute,
+  designRoute,
   appLayout.addChildren([
     dashboardRoute.addChildren([
       dashboardIndexRoute,

@@ -49,7 +49,7 @@ export function ProfilePageLoaded({ profile }: { profile: ProfileRow }) {
   const canSave = formState.isDirty && !formState.isSubmitting;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col channel-coral">
       <PageHeader
         title="Profile"
         actions={<SaveButton canSave={canSave} submitting={formState.isSubmitting} />}

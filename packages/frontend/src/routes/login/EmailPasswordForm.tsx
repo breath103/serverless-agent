@@ -39,7 +39,7 @@ export function EmailPasswordForm({
       onSubmit={(e) => { void onSubmit(e); }}
       className="flex flex-col gap-4"
     >
-      <Field label="USERNAME">
+      <Field label="Username">
         <Input
           type="text"
           placeholder="Username"
@@ -50,7 +50,7 @@ export function EmailPasswordForm({
       </Field>
 
       {mode === "sign-up" && (
-        <Field label="NAME">
+        <Field label="Name">
           <Input
             type="text"
             placeholder="Name"
@@ -61,7 +61,7 @@ export function EmailPasswordForm({
         </Field>
       )}
 
-      <Field label="PASSPHRASE">
+      <Field label="Password">
         <Input
           type="password"
           placeholder="Password"
@@ -85,7 +85,7 @@ export function EmailPasswordForm({
         loading={formState.isSubmitting}
         disabled={!formState.isValid}
       >
-        {mode === "sign-in" ? "AUTHENTICATE" : "REGISTER"}
+        {mode === "sign-in" ? "Sign in" : "Create account"}
       </Button>
     </form>
   );

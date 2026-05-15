@@ -12,7 +12,7 @@ export type ContextMenuState = { x: number; y: number };
 // entries to global.css for something used only by this module doesn't
 // pay its way.
 const surfaceClass = cn(
-  "z-50 min-w-[180px] overflow-hidden border border-amber bg-background p-0 bloom-edge",
+  "z-50 min-w-[180px] overflow-hidden border border-cream-hair bg-background p-0 bloom-edge",
   "data-[state=closed]:animate-out data-[state=closed]:fade-out",
   "data-[state=open]:animate-in data-[state=open]:fade-in",
   "duration-120 data-[state=closed]:ease-in data-[state=open]:ease-out",
@@ -21,7 +21,7 @@ const surfaceClass = cn(
 const itemClass = cn(
   "flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left font-semibold uppercase outline-none",
   "text-text-1 transition-colors duration-100",
-  "hover:bg-amber/10 data-highlighted:bg-amber/15",
+  "hover:bg-cream/10 data-highlighted:bg-cream/15",
   "data-disabled:pointer-events-none data-disabled:opacity-50",
 );
 

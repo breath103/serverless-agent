@@ -30,7 +30,7 @@ export function MemoryDetailHeader({
   return (
     <header
       className={cn(
-        "flex items-start gap-3 border-b border-amber px-6 pt-5 pb-4",
+        "flex items-start gap-3 border-b border-cream-hair px-6 pt-5 pb-4",
         fullScreen && "px-10",
       )}
     >

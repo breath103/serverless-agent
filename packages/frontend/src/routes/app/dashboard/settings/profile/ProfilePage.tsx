@@ -17,7 +17,7 @@ export function ProfilePage() {
 
   if (!profile) {
     return (
-      <PageShell title="Profile">
+      <PageShell title="Profile" channel="coral">
         <div className="flex h-full items-center justify-center">
           <span className="hud-label">
             {status === "error" ? "! FAILED TO LOAD PROFILE" : "LOADING…"}

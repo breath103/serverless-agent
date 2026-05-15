@@ -168,17 +168,13 @@ export function PanelsSection() {
         <div className="mb-1 hud-label">DEFAULT (AMBER)</div>
         <div className="hud-caption">hud-panel — bordered amber container with edge bloom.</div>
       </div>
-      <div className="hud-panel-op hud-panel">
+      <div className="hud-panel hud-panel-op">
         <div className="mb-1 hud-label">OPERATIONAL (MINT)</div>
         <div className="hud-caption">hud-panel-op — operational subsystem.</div>
       </div>
-      <div className="hud-panel-down hud-panel">
+      <div className="hud-panel hud-panel-down">
         <div className="mb-1 hud-label">FAILURE (RED)</div>
         <div className="hud-caption">hud-panel-down — system in failure state.</div>
-      </div>
-      <div className="hud-panel-action hud-panel">
-        <div className="mb-1 hud-label">ACTION (DASHED)</div>
-        <div className="hud-caption">hud-panel-action — outside the data plane.</div>
       </div>
     </div>
   );

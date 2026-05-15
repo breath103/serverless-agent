@@ -14,19 +14,10 @@ export function SidebarBottomBar({ collapsed }: { collapsed: boolean }) {
   return (
     <div
       className={cn(
-        "border-t border-amber px-3 py-2",
-        collapsed ? "flex justify-center" : "flex items-center justify-between gap-2",
+        "border-t border-cream-hair px-3 py-2",
+        collapsed ? "flex justify-center" : "flex items-center justify-end gap-2",
       )}
     >
-      {!collapsed && (
-        <div
-          className="flex items-center gap-1.5 hud-caption text-mint"
-          style={{ letterSpacing: "0.08em" }}
-        >
-          <span className="animate-hud-blink" aria-hidden>▪</span>
-          <span>SECURE</span>
-        </div>
-      )}
       <button
         type="button"
         aria-label="Sign out"

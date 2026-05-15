@@ -12,6 +12,7 @@ const entityConfig = {
   chat_sessions: { id: "id" },
   chat_session_messages: { id: "id" },
   profiles: { id: "user_id" },
+  user_skills: { id: "id" },
 } as const satisfies EntityConfig<PublicEntities>;
 
 type PublicEntityConfig = typeof entityConfig;

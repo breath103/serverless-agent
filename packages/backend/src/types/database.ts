@@ -1,4 +1,5 @@
 import type { ChatSessionMessageData } from "../lib/realtime-events.js";
+import type { InstallableSkillConfig } from "../skills/index.js";
 import type { ProfileDebug } from "./profile.js";
 
 /**
@@ -67,4 +68,13 @@ export type ChatSessionMessageRow = {
   created_at_id: string;
   data: ChatSessionMessageData;
   created_at: string;
+};
+
+/** @public — required from frontend */
+export type UserSkillRow = {
+  user_id: string;
+  id: string;
+  data: InstallableSkillConfig;
+  created_at: string;
+  updated_at: string;
 };

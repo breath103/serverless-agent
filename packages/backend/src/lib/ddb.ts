@@ -42,4 +42,5 @@ export const tables = {
   memories: () => tableName("memories"),
   chatSessions: () => tableName("chat-sessions"),
   chatMessages: () => tableName("chat-messages"),
+  userSkills: () => tableName("user-skills"),
 };

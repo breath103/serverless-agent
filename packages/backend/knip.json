@@ -4,6 +4,7 @@
   "ignoreDependencies": ["tsx"],
   "entry": [
     "src/lambda-*/handler.ts",
+    "src/worker/handler.ts",
     "scripts/*.ts",
     "src/**/__tests__/*.test.ts"
   ],

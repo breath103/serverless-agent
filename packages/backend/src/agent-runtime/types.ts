@@ -1,3 +1,4 @@
+import type { googleCalendar } from "./skill-runtimes/google-calendar.js";
 import type { memory } from "./skill-runtimes/memory.js";
 import type { webSearch } from "./skill-runtimes/web-search.js";
 
@@ -24,4 +25,5 @@ type CallsOf<Id extends string, F> = {
 
 export type SkillCall =
   | CallsOf<"memory", typeof memory>
-  | CallsOf<"web-search", typeof webSearch>;
+  | CallsOf<"web-search", typeof webSearch>
+  | CallsOf<"google-calendar", typeof googleCalendar>;

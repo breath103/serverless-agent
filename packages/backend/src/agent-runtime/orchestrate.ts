@@ -1,3 +1,4 @@
+import { dispatchTextToTelegram, resolveTelegramTargets, type TelegramTarget } from "../channels/telegram-dispatcher.js";
 import { chatSessionsRepo } from "../chat-sessions/chat-sessions-repository.js";
 import type { ChatSessionMessageData } from "../lib/realtime-events.js";
 import { publishRealtimeEvent } from "../lib/realtime-publish.js";
@@ -49,6 +50,10 @@ export async function runChatTurn(opts: {
   const history: LlmMessage[] = rowsToLlmMessages(initialRows);
   annotateLastUserMessageWithTime(history, profile?.timezone);
 
+  // Resolve channel targets once per turn — the binding doesn't change mid-turn
+  // and a per-text-block lookup would be N redundant queries.
+  const telegramTargets = await resolveTelegramTargets({ userId, sessionId });
+
   try {
     for (let step = 0; step < MAX_TURN_STEPS; step += 1) {
       const { message } = await anthropic.chat({
@@ -58,7 +63,7 @@ export async function runChatTurn(opts: {
       });
 
       for (const block of message.content) {
-        await persistAssistantBlock({ userId, sessionId, block });
+        await persistAssistantBlock({ userId, sessionId, block, telegramTargets });
       }
       history.push({ role: "assistant", content: message.content });
 
@@ -124,8 +129,9 @@ async function persistAssistantBlock(opts: {
   userId: string;
   sessionId: string;
   block: LlmAssistantContentBlock;
+  telegramTargets: TelegramTarget[];
 }): Promise<void> {
-  const { userId, sessionId, block } = opts;
+  const { userId, sessionId, block, telegramTargets } = opts;
 
   switch (block.type) {
     case "text": {
@@ -134,6 +140,8 @@ async function persistAssistantBlock(opts: {
         sessionId,
         data: { role: "assistant", content: { kind: "text", text: block.text } },
       });
+      // Only `text` mirrors out — tool_use/tool_result are agent internals.
+      await dispatchTextToTelegram(telegramTargets, block.text);
       break;
     }
     case "tool_use": {

@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
@@ -5,11 +7,12 @@ import { edgeUrl, route } from "../../lib/app-context.js";
 import { publishRealtimeEvent } from "../../lib/realtime-publish.js";
 import type { InstallableSkillId, Oauth2InstallSkillMap } from "../../skills/index.js";
 import { skillHandlers } from "../../skills/index.js";
+import { telegramGetMe, telegramSetWebhook } from "../../skills/telegram.js";
 import { userSkillsRepo } from "../../skills/user-skills-repository.js";
 
 const OAUTH_CALLBACK_PATH = "/api/skills/oauth/callback";
 
-function requireOauth2Handler(skillId: string): Oauth2InstallSkillMap[InstallableSkillId] {
+function requireOauth2Handler(skillId: string): Oauth2InstallSkillMap[keyof Oauth2InstallSkillMap] {
   if (!(skillId in skillHandlers)) {
     throw new HTTPException(422, { message: `Unknown skill: ${skillId}` });
   }
@@ -17,7 +20,7 @@ function requireOauth2Handler(skillId: string): Oauth2InstallSkillMap[Installabl
   if (handler.install.type !== "oauth2") {
     throw new HTTPException(422, { message: `Skill "${skillId}" is not oauth2-installable` });
   }
-  return handler as Oauth2InstallSkillMap[InstallableSkillId];
+  return handler as Oauth2InstallSkillMap[keyof Oauth2InstallSkillMap];
 }
 
 export const routes = [
@@ -75,6 +78,52 @@ export const routes = [
     },
   }),
 
+  // Token-based install for Telegram. Mirrors the oauth2 flow but bypasses
+  // the consent redirect — the user pastes a Bot API token created via
+  // @BotFather, we verify it via getMe, then register the webhook against
+  // the row's primary-key URL (skipped in dev — Telegram won't call localhost).
+  route("/api/skills/install/telegram", "POST", {
+    body: { botToken: z.string().min(1) },
+    handler: async ({ body, c }) => {
+      const user = c.get("requireUser")();
+
+      const { bot_username } = await telegramGetMe(body.botToken).catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new HTTPException(422, { message: `Telegram getMe failed: ${msg}` });
+      });
+      const webhook_secret = randomBytes(32).toString("hex");
+
+      const row = await userSkillsRepo.upsert({
+        userId: user.id,
+        skillId: "telegram",
+        config: {
+          bot_token: body.botToken,
+          telegram_chat_id: null,
+          chat_session_id: null,
+          webhook_secret,
+          bot_username,
+        },
+      });
+
+      if (process.env.NODE_ENV !== "development") {
+        try {
+          await telegramSetWebhook(
+            body.botToken,
+            edgeUrl(c, `/api/telegram/webhook/${user.id}/${row.id}`),
+            webhook_secret,
+          );
+        } catch (err) {
+          await userSkillsRepo.deleteForUser(user.id, row.id);
+          const msg = err instanceof Error ? err.message : String(err);
+          throw new HTTPException(502, { message: `setWebhook failed: ${msg}` });
+        }
+      }
+
+      await publishRealtimeEvent(user.id, { type: "entity_update", table: "user_skills", op: "upsert", row });
+      return { skillId: "telegram" as const, bot_username };
+    },
+  }),
+
   route("/api/skills/installed", "GET", {
     handler: async ({ c }) => {
       const user = c.get("requireUser")();
@@ -89,7 +138,9 @@ export const routes = [
       const row = await userSkillsRepo.getByIdForUser(user.id, params.id);
       if (!row) throw new HTTPException(404, { message: "Skill not installed" });
 
-      const handler = requireOauth2Handler(row.data.skill_id);
+      // Both oauth2 and telegram install variants carry an `uninstall` hook.
+      // Builtin skills never end up in user_skills, so the union is closed.
+      const handler = skillHandlers[row.data.skill_id];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument -- skill_id ↔ config correlation enforced by InstallableSkillConfig discriminator
       await handler.install.uninstall(row.data.config as any).catch((err) => {
         console.warn(`[uninstall] skill=${row.data.skill_id} user=${user.id} id=${row.id}: ${err instanceof Error ? err.message : String(err)}`);

@@ -3,6 +3,7 @@ import { z } from "zod";
 // List of skills
 import { memory, webSearch } from "./builtins.js";
 import { googleCalendar } from "./google.js";
+import { telegram } from "./telegram.js";
 
 export const skillHandlers = {
   // Builtins
@@ -11,6 +12,9 @@ export const skillHandlers = {
 
   // Installable — Google (oauth2)
   [googleCalendar.id]: googleCalendar,
+
+  // Installable — Telegram (channel, token-based)
+  [telegram.id]: telegram,
 } as const;
 
 type SkillMap = typeof skillHandlers;
@@ -33,12 +37,14 @@ type InstallTypeFilteredSkillMap<Type extends string> = {
 
 /** @public — required from frontend */
 export type Oauth2InstallSkillMap = InstallTypeFilteredSkillMap<"oauth2">;
+/** @public — required from frontend */
+export type TelegramInstallSkillMap = InstallTypeFilteredSkillMap<"telegram">;
 
 /** @public — required from frontend */
-export type InstallableSkillId = keyof Oauth2InstallSkillMap;
+export type InstallableSkillId = keyof Oauth2InstallSkillMap | keyof TelegramInstallSkillMap;
 /** @public — Tagged-union of every installable skill's persisted config. */
 export type InstallableSkillConfig = {
-  [K in InstallableSkillId]: { skill_id: K; config: z.infer<Oauth2InstallSkillMap[K]["configSchema"]> }
+  [K in InstallableSkillId]: { skill_id: K; config: z.infer<SkillMap[K]["configSchema"]> }
 }[InstallableSkillId];
 
 /**

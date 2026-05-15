@@ -6,6 +6,7 @@ import { routes as memoryRoutes } from "./memory.js";
 import { routes as profileRoutes } from "./profile.js";
 import { routes as realtimeRoutes } from "./realtime.js";
 import { routes as skillRoutes } from "./skill.js";
+import { routes as telegramWebhookRoutes } from "./telegram-webhook.js";
 
 export const api = routes(
   ...healthRoutes,
@@ -14,6 +15,7 @@ export const api = routes(
   ...realtimeRoutes,
   ...profileRoutes,
   ...skillRoutes,
+  ...telegramWebhookRoutes,
 );
 
 /** @public — required from frontend */

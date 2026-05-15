@@ -4,13 +4,15 @@ import type { InstallableSkillId } from "@backend/skills/index";
 import type { UserSkillRow } from "@backend/types/database";
 
 import { Button } from "@/components/ui/button";
+import { useOpenModal } from "@/components/ui/modal";
 import { useRequiredAuth } from "@/contexts/AuthContext";
 import { useRepositoryListQuery } from "@/contexts/RepositoryContext";
 import { useMutation } from "@/hooks/useMutation";
 import { api } from "@/lib/api";
 import { PageShell } from "@/routes/app/PageShell";
 
-import { SKILL_IDS, SKILLS } from "./skills";
+import { accountLabel, SKILL_IDS, SKILLS } from "./skills";
+import { TelegramInstallDialog } from "./TelegramInstallDialog";
 
 // One-shot read of the post-OAuth redirect query params, then clears them
 // from the URL so a reload doesn't re-show the banner.
@@ -76,7 +78,7 @@ function SkillCard({ skillId, row }: { skillId: InstallableSkillId; row: UserSki
         <div className="mt-0.5 text-[0.75rem] text-text-2">{settings.description}</div>
         {row && (
           <div className="mt-1 text-[0.6875rem] text-mint">
-            {settings.buildAccountLabel(row.data.config)}
+            {accountLabel(row.data)}
           </div>
         )}
       </div>
@@ -86,6 +88,11 @@ function SkillCard({ skillId, row }: { skillId: InstallableSkillId; row: UserSki
 }
 
 function ConnectButton({ skillId }: { skillId: InstallableSkillId }) {
+  if (skillId === "telegram") return <TelegramConnectButton />;
+  return <OauthConnectButton skillId={skillId} />;
+}
+
+function OauthConnectButton({ skillId }: { skillId: Exclude<InstallableSkillId, "telegram"> }) {
   const connect = useMutation(
     async () => await api.fetch("/api/skills/install/oauth/redirect", "POST", { body: { skillId } }),
     [skillId],
@@ -100,6 +107,19 @@ function ConnectButton({ skillId }: { skillId: InstallableSkillId }) {
           if (result) window.location.href = result.redirectUrl;
         });
       }}
+    >
+      CONNECT
+    </Button>
+  );
+}
+
+function TelegramConnectButton() {
+  const openModal = useOpenModal();
+  return (
+    <Button
+      variant="primary"
+      size="sm"
+      onClick={() => { openModal(TelegramInstallDialog, {}); }}
     >
       CONNECT
     </Button>

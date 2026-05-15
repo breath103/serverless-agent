@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import type { InstallableSkillConfig } from "../skills/index.js";
+import { taggedConfig } from "../skills/index.js";
 import { refreshAndPersist } from "../skills/refresh.js";
 import { userSkillsRepo } from "../skills/user-skills-repository.js";
 import type { SkillRuntimeInstance } from "./skill-runtimes/define.js";
@@ -76,11 +76,11 @@ export async function buildSkills(opts: {
       ({ config } = await refreshAndPersist(row));
     } catch (err) {
       console.error(
-        `[buildSkills] skipping ${row.data.skill_id} for user=${opts.userId}: ${err instanceof Error ? err.message : String(err)}`,
+        `[build-skills] skill=${row.data.skill_id} user=${opts.userId} id=${row.id}: ${err instanceof Error ? err.message : String(err)} — skipping binding`,
       );
       continue;
     }
-    const instance = loadSkill(row.id, { skill_id: row.data.skill_id, config } as InstallableSkillConfig);
+    const instance = loadSkill(row.id, taggedConfig(row.data.skill_id, config));
     const variableName = toCamelCase(instance.skillId);
     const nsName = toPascalCase(instance.skillId);
     bindings[variableName] = traceInstance(instance, opts.skillCalls);

@@ -8,8 +8,7 @@ import { taggedConfig } from "../../skills/index.js";
 import { TELEGRAM_SECRET_HEADER } from "../../skills/telegram.js";
 import { userSkillsRepo } from "../../skills/user-skills-repository.js";
 
-// Minimal slice of the Telegram Update we care about. Other update kinds
-// (edited_message, channel_post, callback_query, ...) are ignored.
+// Slice of Telegram Update we read. Other update kinds (edited_message, channel_post, …) ignored.
 const ChatSchema = z.object({
   id: z.union([z.number(), z.string()]).transform(String),
   type: z.string(),
@@ -30,7 +29,6 @@ const UpdateSchema = z.object({
   message: MessageSchema.optional(),
 }).passthrough();
 
-/** Turn a Telegram message into the user-message text our agent sees. */
 function renderInboundText(msg: z.infer<typeof MessageSchema>): string | null {
   const placeholders: string[] = [];
   if (msg.photo !== undefined) placeholders.push("[image] - not supported yet");
@@ -61,7 +59,7 @@ export const routes = [
       if (!body.message) return { ok: true };
       const msg = body.message;
 
-      // Group-chat traffic would otherwise bind the skill to a group on first message.
+      // Reject non-private chats so the bot can't accidentally bind to a group on first message.
       if (msg.chat.type !== "private") return { ok: true };
 
       if (row.data.config.telegram_chat_id !== null && row.data.config.telegram_chat_id !== msg.chat.id) {
@@ -75,10 +73,6 @@ export const routes = [
       const existingSessionId = row.data.config.chat_session_id;
 
       if (existingSessionId === null) {
-        // First inbound: spawn the standard chat-session lifecycle, then write
-        // the binding onto the skill row. The outbound dispatcher is lazy
-        // (resolves on first assistant text), so updateData has plenty of
-        // time to land before any reply gets generated.
         const { sessionId } = await startChatSession({ userId, kind: "user", userMessageText });
         await userSkillsRepo.updateData(userId, row.id, taggedConfig("telegram", {
           ...row.data.config,

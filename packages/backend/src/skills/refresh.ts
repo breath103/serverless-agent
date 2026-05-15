@@ -20,8 +20,7 @@ export async function refreshAndPersist(
   row: UserSkillRow,
 ): Promise<{ config: InstallableSkillConfig["config"]; rotated: boolean }> {
   const handler = skillHandlers[row.data.skill_id];
-  // Only oauth2 install variants carry a `refreshConfig` — channel skills
-  // (telegram) have no token lifecycle and stay as-is.
+  // Channel skills have no token lifecycle.
   if (handler.install.type !== "oauth2") return { config: row.data.config, rotated: false };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- skill_id ↔ config correlation enforced by InstallableSkillConfig discriminator

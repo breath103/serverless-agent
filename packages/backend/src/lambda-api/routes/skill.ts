@@ -78,10 +78,6 @@ export const routes = [
     },
   }),
 
-  // Token-based install for Telegram. Mirrors the oauth2 flow but bypasses
-  // the consent redirect — the user pastes a Bot API token created via
-  // @BotFather, we verify it via getMe, then register the webhook against
-  // the row's primary-key URL (skipped in dev — Telegram won't call localhost).
   route("/api/skills/install/telegram", "POST", {
     body: { botToken: z.string().min(1) },
     handler: async ({ body, c }) => {
@@ -105,9 +101,7 @@ export const routes = [
         },
       });
 
-      // In dev, Telegram won't call localhost — so we only register the
-      // webhook if either we're not in dev, OR the user has set up a tunnel
-      // and exposed it via EDGE_PUBLIC_URL (e.g. cloudflared --url http://localhost:6001).
+      // Dev skips setWebhook (Telegram won't call localhost) unless a tunnel URL is set.
       const publicHost = process.env.EDGE_PUBLIC_URL;
       const shouldRegister = process.env.NODE_ENV !== "development" || publicHost !== undefined;
       if (shouldRegister) {
@@ -141,8 +135,6 @@ export const routes = [
       const row = await userSkillsRepo.getByIdForUser(user.id, params.id);
       if (!row) throw new HTTPException(404, { message: "Skill not installed" });
 
-      // Both oauth2 and telegram install variants carry an `uninstall` hook.
-      // Builtin skills never end up in user_skills, so the union is closed.
       const handler = skillHandlers[row.data.skill_id];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument -- skill_id ↔ config correlation enforced by InstallableSkillConfig discriminator
       await handler.install.uninstall(row.data.config as any).catch((err) => {

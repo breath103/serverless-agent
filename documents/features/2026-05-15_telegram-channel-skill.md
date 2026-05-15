@@ -232,7 +232,7 @@ The row delete is handled by the existing route logic.
 
 ## E2E — `packages/backend/scripts/e2e_telegram.ts`
 
-Exercises the full inbound/outbound shape without touching real Telegram. The Telegram Bot API base URL is configurable via env (`TELEGRAM_BOT_API_BASE`, defaults to `https://api.telegram.org`). The e2e:
+Exercises the full inbound/outbound shape without touching real Telegram. The Telegram Bot API base URL is configurable via env (`TELEGRAM_BOT_API_BASE`, defaults to `https://api.telegram.org`) — the e2e overrides this in-process to point at a mock server. The e2e:
 
 1. Spins up an in-process mock Telegram server on a free port (one route: `/bot:token/:method` → JSON `{ ok: true, result: ... }`). Sets `TELEGRAM_BOT_API_BASE` to that server.
 2. Signs in as `admin`.
@@ -269,7 +269,7 @@ Mocking discipline: only the Telegram Bot API is mocked. Webhook routing, messag
 - `packages/backend/src/agent-runtime/skills.ts` — one-line filter to skip channel skills before `loadSkill`.
 - `packages/backend/src/agent-runtime/orchestrate.ts` — call `dispatchAssistantTextToChannels` in `persistAssistantBlock`'s `case "text"` branch.
 - ~~`packages/backend/src/types/database.ts`~~ — no change. A telegram-bound chat is still `kind: "user"`.
-- `packages/backend/src/env.d.ts` + `.env.sample` — `TELEGRAM_BOT_API_BASE` (optional override, default `https://api.telegram.org`).
+- `packages/backend/src/env.d.ts` — `TELEGRAM_BOT_API_BASE` (test-only override, default `https://api.telegram.org`), `EDGE_PUBLIC_URL` (optional tunnel URL for real-Telegram dev testing).
 - `packages/frontend/src/routes/app/dashboard/settings/skills/SkillsPage.tsx` — render a Telegram card with a "Connect" button that opens the install dialog.
 - `packages/frontend/src/routes/app/dashboard/chats/MessageBlock.tsx` — no change (channel skills produce no skill-call rows; the chat is plain text from agent's perspective).
 - (Optional follow-up) `packages/frontend/.../ChatList.tsx` — show a "via Telegram" badge for chats with `kind: "external"`.

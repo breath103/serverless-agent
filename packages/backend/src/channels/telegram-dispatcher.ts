@@ -20,10 +20,9 @@ async function resolveTelegramTargets(opts: { userId: string; sessionId: string 
 }
 
 /**
- * Build a per-turn dispatcher. Resolves bound Telegram targets lazily on
- * first call and caches them — DDB read happens at most once per turn,
- * after the inbound webhook has had time to write the binding (no race).
- * Per-target send failures are swallowed (web-UI already delivered).
+ * Per-turn dispatcher. Lazy on first call (avoids racing the webhook's
+ * binding-write) and caches the row list (one DDB read per turn).
+ * Per-target failures swallowed — broken bot must not crash the turn.
  */
 export function createTelegramDispatcher(opts: { userId: string; sessionId: string }): (text: string) => Promise<void> {
   let targets: TelegramTarget[] | null = null;

@@ -32,12 +32,7 @@ export const SKILLS: SkillsMap = {
 
 export const SKILL_IDS: InstallableSkillId[] = Object.keys(SKILLS) as InstallableSkillId[];
 
-/**
- * Dispatcher for `buildAccountLabel` over the tagged-union of installed-skill
- * rows. A direct `SKILLS[id].buildAccountLabel(config)` call doesn't typecheck
- * because TS unifies the parameter type across the union to an intersection.
- * The exhaustive switch keeps narrowing per-variant.
- */
+/** Switch keeps per-variant narrowing — a direct `SKILLS[id].buildAccountLabel` call unifies the union to an intersection and breaks. */
 export function accountLabel(data: UserSkillRow["data"]): string {
   switch (data.skill_id) {
     case "google-calendar":

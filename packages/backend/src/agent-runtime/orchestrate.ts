@@ -50,8 +50,6 @@ export async function runChatTurn(opts: {
   const history: LlmMessage[] = rowsToLlmMessages(initialRows);
   annotateLastUserMessageWithTime(history, profile?.timezone);
 
-  // Lazy — resolves on first assistant text, after any inbound-webhook
-  // binding-write has completed. One DDB read per turn, max.
   const sendToTelegram = createTelegramDispatcher({ userId, sessionId });
 
   try {
@@ -140,7 +138,6 @@ async function persistAssistantBlock(opts: {
         sessionId,
         data: { role: "assistant", content: { kind: "text", text: block.text } },
       });
-      // Only `text` mirrors out — tool_use/tool_result are agent internals.
       await sendToTelegram(block.text);
       break;
     }
@@ -158,10 +155,6 @@ async function persistAssistantBlock(opts: {
           },
         },
       });
-      // Progress hint to channel users: the LLM-emitted `description` is the
-      // same one-line label shown in the web UI's tool-call header. Mirror it
-      // to Telegram so the user sees "...working on X..." instead of silence
-      // between their question and the final answer.
       if (block.input.description.length > 0) {
         await sendToTelegram(`_${block.input.description}…_`);
       }

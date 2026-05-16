@@ -54,6 +54,7 @@ export async function api<T>(method: string, path: string, opts: ApiOpts = {}): 
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
   });
   const text = await res.text();
+  // eslint-disable-next-line @typescript-eslint/no-restricted-types
   let parsed: unknown = text;
   try {
     parsed = JSON.parse(text);
@@ -63,6 +64,7 @@ export async function api<T>(method: string, path: string, opts: ApiOpts = {}): 
   return { status: res.status, body: parsed as T, setCookie: res.headers.get("set-cookie") };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-restricted-types
 export function readError(body: unknown): string {
   if (typeof body === "object" && body !== null && "error" in body && typeof body.error === "string") {
     return body.error;

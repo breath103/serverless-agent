@@ -4,7 +4,7 @@
 
 Example repo for the **AWS Summit Korea — DEV308** session *맥 미니 없이도 서버리스로 만드는 AI Cloud Agent*. Speaker: 이상현 (Mirror).
 
-A cloud agent implementation that runs on AWS serverless components only (Lambda, DynamoDB, S3, IoT Core, CloudFront). Includes a chat UI, an LLM loop with tool calling, persistent memory, and realtime browser updates.
+A cloud agent implementation that runs on AWS serverless components only (Lambda, DynamoDB, S3, IoT Core, CloudFront). Includes a chat UI, an LLM loop with tool calling, persistent memory, and realtime browser updates. The AWS infrastructure is effectively unbilled while idle (LLM API costs are separate).
 
 ---
 
@@ -24,7 +24,7 @@ CloudFront (default *.cloudfront.net host)
   │  ┌────────┼─────────────┬──────────────────┐
   │  ▼        ▼             ▼                  ▼
   │ DynamoDB  S3            Agent Runtime      AWS IoT Core
-  │ (6 tables)(agent files) (LLM loop +        (MQTT topic per
+  │ (7 tables)(agent files) (LLM loop +        (MQTT topic per
   │  │         │             sandbox + skills)  user/session)
   │  │         │             │                  │
   │  └─────────┴─────────────┴──────────────────┘
@@ -39,7 +39,7 @@ CloudFront (default *.cloudfront.net host)
 
 **Agent runtime — LLM loop in Lambda.** `packages/backend/src/agent-runtime/`. The LLM is given one tool, `executeCode`, which runs TypeScript inside a sandbox. The sandbox exposes typed bindings to the skills under `skill-runtimes/` (`memory`, `web-search`, `google-calendar`). Every skill call goes through a Proxy that emits a trace event; the UI uses those events to render tool-call cards.
 
-**Storage — DynamoDB.** Six tables declared in `packages/backend/scripts/lib/backend-stack.ts`: `users`, `sessions`, `profiles`, `memories`, `chat-sessions`, `chat-messages`. On-demand pricing, PITR on. The `sessions` table has DynamoDB TTL on `expires_at_epoch`. Repos under `src/<domain>/*-repository.ts` go through the DocumentClient singleton in `src/lib/ddb.ts`. Table names are injected as env vars by CDK.
+**Storage — DynamoDB.** Seven tables declared in `packages/backend/scripts/lib/backend-stack.ts`: `users`, `sessions`, `profiles`, `memories`, `chat-sessions`, `chat-messages`, `user-skills`. On-demand pricing, PITR on. The `sessions` table has DynamoDB TTL on `expires_at_epoch`. Repos under `src/<domain>/*-repository.ts` go through the DocumentClient singleton in `src/lib/ddb.ts`. Table names are injected as env vars by CDK.
 
 **Files — S3.** Agent-generated artifacts (transcripts, downloads) live in a bucket separate from the SPA. Pre-signed URLs on read.
 
@@ -54,12 +54,13 @@ CloudFront (default *.cloudfront.net host)
 1. First page load: Browser → CloudFront → S3 (static).
 2. Send message: Browser `POST /api/chat-sessions/:id/messages` → CloudFront → Lambda@Edge rewrites to the backend Function URL → backend Lambda.
 3. Backend Lambda writes the user message to DDB, returns 200, and starts the agent run for that session asynchronously.
-4. Agent runtime reads context from DDB (recent messages, profile, memories), calls Anthropic with `executeCode` as the only tool, and runs the returned TypeScript in the sandbox.
-5. Inside the sandbox, `await webSearch.query(...)` hits Tavily; `await memory.upsert(...)` writes to DDB. Each call is traced and published as an MQTT event.
-6. Browser receives the MQTT events and re-renders message rows and tool-call cards. No polling.
-7. Agent writes the final assistant message to DDB, publishes a final event, and the Lambda goes idle.
+4. Agent runtime reads context from DDB (recent messages, profile, memories) and calls Anthropic with `executeCode` as the only tool.
+5. The LLM-written TypeScript is type-checked via the TypeScript compiler API. Type errors are surfaced back to the LLM for a retry.
+6. The code runs in the sandbox. Inside, `await webSearch.query(...)` hits Tavily, `await memory.upsert(...)` writes to DDB. Each call is traced and published as an MQTT event; messages and tool-call state are written to DDB as they happen.
+7. Browser receives the MQTT events and re-renders message rows and tool-call cards. No polling.
+8. Agent writes the final assistant message to DDB, publishes a final event, and the Lambda goes idle.
 
-Per request, the infrastructure used is: 1 Lambda function, 6 DDB tables, 1 S3 bucket, 1 IoT topic per user, 1 CloudFront distribution.
+Per request, the infrastructure used is: 1 Lambda function, 7 DDB tables, 1 S3 bucket, 1 IoT topic per user, 1 CloudFront distribution.
 
 ---
 
@@ -75,6 +76,8 @@ packages/
       profiles/                      ← profiles-repository on DynamoDB
       memories/                      ← memories-repository on DynamoDB
       chat-sessions/                 ← chat sessions + messages on DynamoDB
+      skills/                        ← OAuth skill definitions (Google, etc.) on DynamoDB
+      channels/                      ← Telegram channel dispatcher
       agent-runtime/                 ← LLM loop, sandbox, skill runtime
         skill-runtimes/              ← skills (memory, web-search, google-calendar)
       lambda-api/                    ← Hono routes

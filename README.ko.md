@@ -2,9 +2,9 @@
 
 > English version: **[README.md](./README.md)**
 
-**AWS Summit Korea — DEV308** 세션 *맥 미니 없이도 서버리스로 만드는 AI Cloud Agent* 의 예제 저장소입니다. 발표자: 이상현 (Mirror).
+**AWS Summit Korea — DEV308** 세션 *맥 미니 없이도 서버리스로 만드는 AI Cloud Agent* 데모입니다. 발표자: 이상현 (Mirror).
 
-AWS의 serverless 컴포넌트(Lambda, DynamoDB, S3, IoT Core, CloudFront)만으로 동작하는 cloud agent 구현입니다. 채팅 UI, LLM loop + tool calling 런타임, 영구 메모리, 실시간 브라우저 업데이트가 포함되어 있습니다.
+AWS의 serverless 컴포넌트(Lambda, DynamoDB, S3, IoT Core, CloudFront)만으로 동작하는 cloud agent 구현입니다. 채팅 UI, LLM loop + tool calling 런타임, 영구 메모리, 실시간 브라우저 업데이트가 포함되어 있습니다. AWS 인프라는 idle 상태에서는 사실상 청구되지 않습니다 (LLM API 비용은 별도).
 
 ---
 
@@ -24,7 +24,7 @@ CloudFront (기본 *.cloudfront.net 호스트)
   │  ┌────────┼─────────────┬──────────────────┐
   │  ▼        ▼             ▼                  ▼
   │ DynamoDB  S3            Agent Runtime      AWS IoT Core
-  │ (6개 테이블)(에이전트 파일)(LLM loop +       (사용자/세션 단위
+  │ (7개 테이블)(에이전트 파일)(LLM loop +       (사용자/세션 단위
   │  │         │             샌드박스 + 스킬)    MQTT 토픽)
   │  │         │             │                  │
   │  └─────────┴─────────────┴──────────────────┘
@@ -39,7 +39,7 @@ CloudFront (기본 *.cloudfront.net 호스트)
 
 **Agent runtime — Lambda 안의 LLM loop.** `packages/backend/src/agent-runtime/`. LLM에게는 도구가 단 하나, `executeCode`만 노출됩니다. 이 도구는 샌드박스 안에서 TypeScript를 실행하고, 샌드박스에는 `skill-runtimes/` 아래 스킬들(`memory`, `web-search`, `google-calendar`)에 대한 타입이 붙은 바인딩이 있습니다. 모든 스킬 호출은 Proxy를 거쳐 trace 이벤트를 발행하고, UI는 그 이벤트로 tool-call 카드를 그립니다.
 
-**Storage — DynamoDB.** 테이블 6개, `packages/backend/scripts/lib/backend-stack.ts`에 선언됨: `users`, `sessions`, `profiles`, `memories`, `chat-sessions`, `chat-messages`. On-demand 가격제, PITR 활성화. `sessions` 테이블은 `expires_at_epoch` 컬럼에 DynamoDB TTL을 걸어둠. 리포지토리는 `src/<domain>/*-repository.ts` 아래에서 `src/lib/ddb.ts`의 DocumentClient 싱글톤을 거칩니다. 테이블 이름은 CDK가 환경 변수로 주입.
+**Storage — DynamoDB.** 테이블 7개, `packages/backend/scripts/lib/backend-stack.ts`에 선언됨: `users`, `sessions`, `profiles`, `memories`, `chat-sessions`, `chat-messages`, `user-skills`. On-demand pricing, PITR 활성화. `sessions` 테이블은 `expires_at_epoch` 컬럼에 DynamoDB TTL을 걸어둠. 리포지토리는 `src/<domain>/*-repository.ts` 아래에서 `src/lib/ddb.ts`의 DocumentClient 싱글톤을 거칩니다. 테이블 이름은 CDK가 환경 변수로 주입.
 
 **Files — S3.** 에이전트가 만든 산출물(transcript, 다운로드 등)은 SPA와 별도의 버킷에 저장. 읽을 때 pre-signed URL 발급.
 
@@ -54,12 +54,13 @@ CloudFront (기본 *.cloudfront.net 호스트)
 1. 첫 페이지 로드: Browser → CloudFront → S3 (정적).
 2. 메시지 전송: Browser가 `/api/chat-sessions/:id/messages`로 POST → CloudFront → Lambda@Edge가 backend Function URL로 재작성 → backend Lambda.
 3. backend Lambda가 사용자 메시지를 DDB에 쓰고 200을 응답한 뒤, 해당 세션의 에이전트 실행을 비동기로 시작.
-4. Agent runtime이 DDB에서 컨텍스트(최근 메시지, 프로필, 메모리)를 읽고, `executeCode`를 유일한 도구로 Anthropic을 호출, 반환된 TypeScript를 샌드박스에서 실행.
-5. 샌드박스 안에서 `await webSearch.query(...)`는 Tavily를, `await memory.upsert(...)`는 DDB를 호출. 각 호출은 trace되어 MQTT 이벤트로 발행.
-6. 브라우저는 MQTT 이벤트를 받아 메시지 row와 tool-call 카드를 리렌더링. polling 없음.
-7. 에이전트가 최종 assistant 메시지를 DDB에 쓰고 마지막 이벤트를 발행. Lambda는 idle 상태로 복귀.
+4. Agent runtime이 DDB에서 컨텍스트(최근 메시지, 프로필, 메모리)를 읽고, `executeCode`를 유일한 도구로 Anthropic을 호출.
+5. LLM이 작성한 TypeScript를 TypeScript 컴파일러 API로 타입체크. 타입 에러는 LLM에 반환되어 재시도.
+6. 타입체크가 통과한 코드를 샌드박스에서 실행. 샌드박스 안에서 `await webSearch.query(...)`는 Tavily를, `await memory.upsert(...)`는 DDB를 호출. 각 호출은 trace되어 MQTT 이벤트로 발행되며, 메시지와 tool-call state도 DDB에 쓰이는 즉시 MQTT로 반영.
+7. 브라우저는 MQTT 이벤트를 받아 메시지 row와 tool-call 카드를 리렌더링. polling 없음.
+8. 에이전트가 최종 assistant 메시지를 DDB에 쓰고 마지막 이벤트를 발행. Lambda는 idle 상태로 복귀.
 
-요청 1건당 쓰이는 인프라: Lambda 함수 1개, DDB 테이블 6개, S3 버킷 1개, 사용자당 IoT 토픽 1개, CloudFront 배포 1개.
+요청 1건당 쓰이는 인프라: Lambda 함수 1개, DDB 테이블 7개, S3 버킷 1개, 사용자당 IoT 토픽 1개, CloudFront 배포 1개.
 
 ---
 
@@ -75,6 +76,8 @@ packages/
       profiles/                      ← DynamoDB 위의 profiles-repository
       memories/                      ← DynamoDB 위의 memories-repository
       chat-sessions/                 ← DynamoDB 위의 chat sessions + messages
+      skills/                        ← OAuth 스킬 정의 (Google 등) on DynamoDB
+      channels/                      ← Telegram 채널 dispatcher
       agent-runtime/                 ← LLM loop, 샌드박스, 스킬 런타임
         skill-runtimes/              ← 스킬들 (memory, web-search, google-calendar)
       lambda-api/                    ← Hono 라우트

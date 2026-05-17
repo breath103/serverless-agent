@@ -1,7 +1,7 @@
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
-import { beginGenerating } from "../../agent-runtime/index.js";
+import { beginGenerating } from "../../agent-runtime/lifecycle.js";
 import { continueChatSession, startChatSession } from "../../agent-runtime/start-chat-session.js";
 import { chatSessionsRepo } from "../../chat-sessions/chat-sessions-repository.js";
 import { route } from "../../lib/app-context.js";

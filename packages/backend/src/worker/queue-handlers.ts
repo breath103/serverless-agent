@@ -1,4 +1,5 @@
-import { chatLoop } from "../agent-runtime/index.js";
+import { endGenerating } from "../agent-runtime/lifecycle.js";
+import { runChatTurn } from "../agent-runtime/orchestrate.js";
 import type { WorkerPayload } from "../types/queue-message.js";
 import { refreshAllUserSkills } from "./refresh-user-skills.js";
 
@@ -8,7 +9,11 @@ export async function handleWorkerPayload(payload: WorkerPayload): Promise<void>
       await refreshAllUserSkills();
       return;
     case "run_chat":
-      await chatLoop({ userId: payload.userId, sessionId: payload.sessionId });
+      try {
+        await runChatTurn({ userId: payload.userId, sessionId: payload.sessionId });
+      } finally {
+        await endGenerating(payload.sessionId, payload.userId);
+      }
       return;
   }
 }

@@ -2,7 +2,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
 import { beginGenerating } from "../../agent-runtime/index.js";
-import { runChatInBackground, startChatSession } from "../../agent-runtime/start-chat-session.js";
+import { continueChatSession, startChatSession } from "../../agent-runtime/start-chat-session.js";
 import { route } from "../../lib/app-context.js";
 import { taggedConfig } from "../../skills/index.js";
 import { TELEGRAM_SECRET_HEADER } from "../../skills/telegram.js";
@@ -87,7 +87,7 @@ export const routes = [
         console.warn(`[telegram-webhook] user=${userId} session=${existingSessionId} busy; dropped inbound`);
         return { ok: true };
       }
-      runChatInBackground({ userId, sessionId: session.id, userMessageText });
+      await continueChatSession({ userId, sessionId: session.id, userMessageText });
       return { ok: true };
     },
   }),

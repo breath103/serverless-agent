@@ -1,35 +1,17 @@
-import { chatSessionsRepo } from "../chat-sessions/chat-sessions-repository.js";
-import { publishRealtimeEvent } from "../lib/realtime-publish.js";
+import { endGenerating } from "./lifecycle.js";
 import { runChatTurn } from "./orchestrate.js";
 
-/**
- * Public entry for the chat loop.
- *
- * 1. Inserts the user message as a new chat_session_message row.
- * 2. Kicks the assistant turn (LLM + tool loop) via `runChatTurn`.
- *
- * Called from HTTP handler — typically inside a try/finally that flips
- * `chat_sessions.is_generating` back to false on the way out.
- */
-export async function chatLoop(opts: {
-  userId: string;
-  sessionId: string;
-  userMessageText: string;
-}): Promise<void> {
-  await insertUserMessage(opts);
-  await runChatTurn({ userId: opts.userId, sessionId: opts.sessionId });
-}
-
-async function insertUserMessage(opts: {
-  userId: string;
-  sessionId: string;
-  userMessageText: string;
-}): Promise<void> {
-  const row = await chatSessionsRepo.insertMessage(opts.sessionId, {
-    role: "user",
-    content: { kind: "text", text: opts.userMessageText },
-  });
-  await publishRealtimeEvent(opts.userId, { type: "entity_update", table: "chat_session_messages", op: "upsert", row });
+// Worker-side entry. Runs one assistant turn and ALWAYS flips
+// `chat_sessions.is_generating` back to false on the way out — the whole
+// reason this function exists is so the cleanup runs synchronously inside
+// the Worker's Lambda execution rather than as a dangling promise on the
+// API handler that Lambda freezes before the `finally` fires.
+export async function chatLoop(opts: { userId: string; sessionId: string }): Promise<void> {
+  try {
+    await runChatTurn({ userId: opts.userId, sessionId: opts.sessionId });
+  } finally {
+    await endGenerating(opts.sessionId, opts.userId);
+  }
 }
 
 export { beginGenerating } from "./lifecycle.js";

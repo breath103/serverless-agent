@@ -2,7 +2,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
 import { beginGenerating } from "../../agent-runtime/index.js";
-import { runChatInBackground, startChatSession } from "../../agent-runtime/start-chat-session.js";
+import { continueChatSession, startChatSession } from "../../agent-runtime/start-chat-session.js";
 import { chatSessionsRepo } from "../../chat-sessions/chat-sessions-repository.js";
 import { route } from "../../lib/app-context.js";
 import { publishRealtimeEvent } from "../../lib/realtime-publish.js";
@@ -34,7 +34,7 @@ export const routes = [
 
       const session = requireOrThrow(await beginGenerating(params.id, user.id), chatBusy);
 
-      runChatInBackground({ userId: user.id, sessionId: session.id, userMessageText: body.message });
+      await continueChatSession({ userId: user.id, sessionId: session.id, userMessageText: body.message });
 
       return { ok: true as const };
     },

@@ -1,18 +1,17 @@
 import { chatSessionsRepo } from "../chat-sessions/chat-sessions-repository.js";
+import { invokeAsyncLambda } from "../lib/async-lambda.js";
 import { publishRealtimeEvent } from "../lib/realtime-publish.js";
 import type { ChatSessionKind } from "../types/database.js";
 import { generateChatTitleInBackground } from "./generate-chat-title.js";
-import { chatLoop } from "./index.js";
-import { endGenerating } from "./lifecycle.js";
 
 /**
- * Create a new chat session, fire the LLM turn in the background, and
- * generate a title in parallel. Returns the sessionId immediately; both
- * background tasks publish realtime events as they progress.
+ * Create a new chat session, append the user message, and async-invoke the
+ * Worker Lambda to run the assistant turn. Returns the sessionId immediately;
+ * the Worker publishes realtime events as it goes.
  *
- * `kind` discriminates user-initiated chats from system-spawned ones —
- * the UI marks `"internal"` chats with an "Auto" badge so users can tell
- * them apart from chats they started.
+ * `kind` discriminates user-initiated chats from system-spawned ones — the
+ * UI marks `"internal"` chats with an "Auto" badge so users can tell them
+ * apart from chats they started.
  *
  * `titleSeedText` overrides the input handed to title-gen. Useful when the
  * actual user message is highly directive ("Please do X, Y, Z"), which
@@ -33,7 +32,7 @@ export async function startChatSession(opts: {
     row: session,
   });
 
-  runChatInBackground({ userId: opts.userId, sessionId: session.id, userMessageText: opts.userMessageText });
+  await continueChatSession({ userId: opts.userId, sessionId: session.id, userMessageText: opts.userMessageText });
   void generateChatTitleInBackground({
     userId: opts.userId,
     sessionId: session.id,
@@ -44,26 +43,23 @@ export async function startChatSession(opts: {
 }
 
 /**
- * Fire-and-forget chatLoop. HTTP returns immediately; the LLM turn
- * runs in the background, writes rows + publishes MQTT as it goes.
- *
- * In local dev this works trivially (long-running Node process). In
- * Lambda production, dangling promises may not complete after the
- * handler returns — when we wire prod, swap this to an async Lambda
- * invoke (same pattern as `enqueueToAgents`).
+ * Append a user message and async-invoke the Worker Lambda to run the
+ * assistant turn. Caller is responsible for `beginGenerating` on the session.
  */
-export function runChatInBackground(opts: {
+export async function continueChatSession(opts: {
   userId: string;
   sessionId: string;
   userMessageText: string;
-}): void {
-  void (async () => {
-    try {
-      await chatLoop(opts);
-    } catch (err) {
-      console.error("[chatLoop] failed", err);
-    } finally {
-      await endGenerating(opts.sessionId, opts.userId);
-    }
-  })();
+}): Promise<void> {
+  const row = await chatSessionsRepo.insertMessage(opts.sessionId, {
+    role: "user",
+    content: { kind: "text", text: opts.userMessageText },
+  });
+  await publishRealtimeEvent(opts.userId, {
+    type: "entity_update",
+    table: "chat_session_messages",
+    op: "upsert",
+    row,
+  });
+  await invokeAsyncLambda({ type: "run_chat", userId: opts.userId, sessionId: opts.sessionId });
 }

@@ -21,6 +21,12 @@ declare namespace NodeJS {
     // table name as `${TABLE_NAME_PREFIX}-<entity>`.
     TABLE_NAME_PREFIX: string; // @cdk-injected
 
+    // Worker Lambda alias ARN. CDK injects it on the API Lambda; the API
+    // `invokeAsyncLambda`s the Worker for `run_chat` and other background
+    // work. Absent in local dev — `invokeAsyncLambda` falls back to running
+    // the handler inline against the long-lived dev Node process.
+    AGENT_WORKER_FUNCTION_NAME: string | undefined; // @cdk-injected
+
     // Optional: local DynamoDB endpoint (when set, ddb client points here with dummy creds)
     DDB_LOCAL_ENDPOINT: string | undefined;
 

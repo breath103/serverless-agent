@@ -13,10 +13,14 @@ export class GitHubActionsIam extends Construct {
   constructor(scope: Construct, id: string, props: GitHubActionsIamProps) {
     super(scope, id);
 
-    const provider = new iam.OpenIdConnectProvider(this, "GitHubOIDC", {
-      url: "https://token.actions.githubusercontent.com",
-      clientIds: ["sts.amazonaws.com"],
-    });
+    // IAM OIDC providers are global per AWS account (one per issuer URL),
+    // so reference the existing provider instead of creating a new one.
+    const providerArn = `arn:aws:iam::${cdk.Stack.of(this).account}:oidc-provider/token.actions.githubusercontent.com`;
+    const provider = iam.OpenIdConnectProvider.fromOpenIdConnectProviderArn(
+      this,
+      "GitHubOIDC",
+      providerArn,
+    );
 
     this.role = new iam.Role(this, "Role", {
       roleName: `${props.project}-github-actions`,

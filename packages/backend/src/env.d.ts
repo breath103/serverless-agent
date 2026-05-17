@@ -29,14 +29,15 @@ declare namespace NodeJS {
     // that captures every Bot API call.
     TELEGRAM_BOT_API_BASE: string | undefined;
 
-    // Optional public HTTPS URL for the edge proxy (e.g. a cloudflared tunnel).
-    // When set, the Telegram install route registers webhooks against this host
-    // instead of the request's edge URL — required for end-to-end testing
-    // against real Telegram from a local dev machine.
-    EDGE_PUBLIC_URL: string | undefined;
+    // Public HTTPS URL for the edge proxy. In prod, CDK injects this from
+    // tss.json's domain + subdomainMap (the subdomain that maps to "main").
+    // In local dev, set by a cloudflared tunnel.
+    EDGE_PUBLIC_URL: string; // @cdk-injected
 
-    // AWS Lambda runtime region (provided by AWS).
-    AWS_REGION: string;
+    // AWS Lambda runtime region — auto-provided by the Lambda runtime in
+    // prod. Reserved env var (CFN rejects it on `Function.environment`),
+    // so never set it ourselves.
+    AWS_REGION: string; // @cdk-injected
 
     // Optional observability
     POSTHOG_KEY: string | undefined;

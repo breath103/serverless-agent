@@ -101,19 +101,14 @@ export const routes = [
         },
       });
 
-      // Dev skips setWebhook (Telegram won't call localhost) unless a tunnel URL is set.
-      const publicHost = process.env.EDGE_PUBLIC_URL;
-      const shouldRegister = process.env.NODE_ENV !== "development" || publicHost !== undefined;
-      if (shouldRegister) {
-        const webhookPath = `/api/telegram/webhook/${user.id}/${row.id}`;
-        const webhookUrl = publicHost ? `${publicHost}${webhookPath}` : edgeUrl(c, webhookPath);
-        try {
-          await telegramSetWebhook(body.botToken, webhookUrl, webhook_secret);
-        } catch (err) {
-          await userSkillsRepo.deleteForUser(user.id, row.id);
-          const msg = err instanceof Error ? err.message : String(err);
-          throw new HTTPException(502, { message: `setWebhook failed: ${msg}` });
-        }
+      const webhookPath = `/api/telegram/webhook/${user.id}/${row.id}`;
+      const webhookUrl = `${process.env.EDGE_PUBLIC_URL}${webhookPath}`;
+      try {
+        await telegramSetWebhook(body.botToken, webhookUrl, webhook_secret);
+      } catch (err) {
+        await userSkillsRepo.deleteForUser(user.id, row.id);
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new HTTPException(502, { message: `setWebhook failed: ${msg}` });
       }
 
       await publishRealtimeEvent(user.id, { type: "entity_update", table: "user_skills", op: "upsert", row });

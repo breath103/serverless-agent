@@ -4,7 +4,7 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 
 import * as cdk from "aws-cdk-lib";
-import { loadConfig } from "shared/config";
+import { loadConfig, type TssConfig } from "shared/config";
 import * as SSMParameters from "shared/ssm-parameters";
 
 import { DescribeEndpointCommand, IoTClient } from "@aws-sdk/client-iot";
@@ -22,7 +22,8 @@ async function main() {
 
   const config = loadConfig();
   const mqttBrokerUrl = await getIotEndpoint(config.backend.region);
-  const stackName = synthesizeStack(config, envVars, mqttBrokerUrl);
+  const publicUrl = computePublicUrl(config);
+  const stackName = synthesizeStack(config, envVars, mqttBrokerUrl, publicUrl);
 
   deploy(stackName);
   storeUrlInSsm(stackName, config);
@@ -83,12 +84,20 @@ async function getIotEndpoint(region: string): Promise<string> {
   return `mqtts://${endpointAddress}:8883`;
 }
 
+function computePublicUrl(config: TssConfig): string | undefined {
+  if (!config.domain) return undefined;
+  const sub = Object.entries(config.subdomainMap).find(([, v]) => v === "main")?.[0];
+  return sub ? `https://${sub}.${config.domain}` : `https://${config.domain}`;
+}
+
 function synthesizeStack(
-  config: ReturnType<typeof loadConfig>,
+  config: TssConfig,
   envVars: Record<string, string>,
   mqttBrokerUrl: string,
+  publicUrl: string | undefined,
 ): string {
   console.log(`\nDeploying to ${config.backend.region} (project: ${config.project})...`);
+  if (publicUrl) console.log(`  publicUrl: ${publicUrl}`);
 
   const app = new cdk.App({ outdir: path.join(ROOT, "cdk.out") });
   const stackId = BackendStack.id({ project: config.project });
@@ -97,6 +106,7 @@ function synthesizeStack(
     project: config.project,
     envVars,
     mqttBrokerUrl,
+    publicUrl,
     env: {
       account: process.env.CDK_DEFAULT_ACCOUNT,
       region: config.backend.region,

@@ -14,7 +14,7 @@
     "devPort": 6002
   },
   "frontend": {
-    "bucketSuffix": "prod",
+    "bucketSuffix": "",
     "devPort": 6003
   },
   "ssm": {

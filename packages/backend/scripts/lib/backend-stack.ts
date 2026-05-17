@@ -20,6 +20,7 @@ interface BackendStackProps extends cdk.StackProps {
   project: string;
   envVars: Record<string, string>;
   mqttBrokerUrl: string;
+  publicUrl?: string;
 }
 
 export class BackendStack extends cdk.Stack {
@@ -154,6 +155,7 @@ export class BackendStack extends cdk.Stack {
       // `${project}-backend`, matching the table names declared above.
       TABLE_NAME_PREFIX: id,
       AGENT_STORAGE_BUCKET: agentBucket.bucketName,
+      ...(props.publicUrl ? { EDGE_PUBLIC_URL: props.publicUrl } : {}),
     };
 
     // ── API Lambda (HTTP handler) ─────────────────────────────────────

@@ -208,10 +208,11 @@ export class BackendStack extends cdk.Stack {
     fn.addEnvironment("AGENT_MQTT_ROLE_ARN", agentMqttRole.roleArn);
     agentMqttRole.grantAssumeRole(fn.role!);
 
-    // ── Worker Lambda (EventBridge-driven cron) ───────────────────────
-    // Same dist asset, different entrypoint. Today only refreshes OAuth
-    // tokens for installed user_skills; future scheduled jobs share this
-    // Lambda and discriminate via event.detail.
+    // ── Worker Lambda ─────────────────────────────────────────────────
+    // Same dist asset, different entrypoint. Receives a discriminated-union
+    // payload: `{ type: "cron_tick" }` from EventBridge, `{ type: "run_chat" }`
+    // async-invoked from the API Lambda. The API hits the alias so new
+    // worker versions roll out without rotating the env var on the API.
     const workerFn = new lambda.Function(this, "Worker", {
       functionName: `${id}-worker`,
       runtime: lambda.Runtime.NODEJS_24_X,
@@ -237,12 +238,25 @@ export class BackendStack extends cdk.Stack {
     }));
     agentMqttRole.grantAssumeRole(workerFn.role!);
 
+    const workerAlias = new lambda.Alias(this, "WorkerAlias", {
+      aliasName: "live",
+      version: workerFn.currentVersion,
+    });
+
+    workerAlias.grantInvoke(fn);
+    fn.addEnvironment("AGENT_WORKER_FUNCTION_NAME", workerAlias.functionArn);
+
     // rate(30 min) is well inside the 1-hour Google access-token lifetime —
     // every row's token gets renewed before it expires even if the user
     // never chats.
     new events.Rule(this, "RefreshUserSkillsSchedule", {
       schedule: events.Schedule.rate(cdk.Duration.minutes(30)),
-      targets: [new targets.LambdaFunction(workerFn)],
+      targets: [new targets.LambdaFunction(workerAlias, {
+        event: events.RuleTargetInput.fromObject({
+          type: "cron_tick",
+          firedAt: events.EventField.time,
+        }),
+      })],
     });
 
     // ── Prewarm Lambdas ───────────────────────────────────────────────

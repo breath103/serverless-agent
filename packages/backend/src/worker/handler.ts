@@ -1,12 +1,13 @@
 /// <reference types="aws-lambda" />
 
-import { refreshAllUserSkills } from "./refresh-user-skills.js";
+import { workerPayloadSchema } from "../types/queue-message.js";
+import { handleWorkerPayload } from "./queue-handlers.js";
 
-/**
- * EventBridge-driven Lambda. Today the only schedule is the user-skills
- * refresh sweep; add a `detail.type` discriminator on the event when a
- * second cron job lands.
- */
-export async function handler(): Promise<void> {
-  await refreshAllUserSkills();
+// Async-invoked Worker Lambda. Receives a plain JSON payload from
+// `invokeAsyncLambda` (API Lambda) or EventBridge (cron). No SQS — each
+// invoke runs in its own execution with its own timeout.
+// eslint-disable-next-line @typescript-eslint/no-restricted-types
+export async function handler(event: unknown): Promise<void> {
+  const payload = workerPayloadSchema.parse(event);
+  await handleWorkerPayload(payload);
 }

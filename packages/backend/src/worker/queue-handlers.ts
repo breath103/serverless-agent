@@ -1,21 +1,12 @@
-import { endGenerating } from "../agent-runtime/lifecycle.js";
-import { runChatTurn } from "../agent-runtime/orchestrate.js";
 import type { WorkerPayload } from "../types/queue-message.js";
-import { refreshAllUserSkills } from "./refresh-user-skills.js";
+import { cronTick } from "./handlers/cron-tick.js";
+import { runChat } from "./handlers/run-chat.js";
 
 const handlers: {
   [K in WorkerPayload["type"]]: (payload: Extract<WorkerPayload, { type: K }>) => Promise<void>;
 } = {
-  cron_tick: async () => {
-    await refreshAllUserSkills();
-  },
-  run_chat: async ({ userId, sessionId }) => {
-    try {
-      await runChatTurn({ userId, sessionId });
-    } finally {
-      await endGenerating(sessionId, userId);
-    }
-  },
+  cron_tick: cronTick,
+  run_chat: runChat,
 };
 
 export async function handleWorkerPayload(payload: WorkerPayload): Promise<void> {

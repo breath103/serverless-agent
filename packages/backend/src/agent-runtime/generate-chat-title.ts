@@ -3,7 +3,7 @@ import { AnthropicBedrock } from "@anthropic-ai/bedrock-sdk";
 import { chatSessionsRepo } from "../chat-sessions/chat-sessions-repository.js";
 import { publishRealtimeEvent } from "../lib/realtime-publish.js";
 
-const MODEL = "anthropic.claude-haiku-4-5-20251001-v1:0";
+const MODEL = "us.anthropic.claude-haiku-4-5-20251001-v1:0";
 
 const client = new AnthropicBedrock();
 

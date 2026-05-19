@@ -16,23 +16,26 @@ Use `@anthropic-ai/bedrock-sdk` — Anthropic's drop-in client for Bedrock. It e
 
 No provider abstraction. `AnthropicClient` stays Anthropic/Bedrock-specific.
 
-### Why single-region foundation IDs, not cross-region inference profiles
+### Model IDs and inference profiles
 
-Bedrock offers two ways to reach a Claude model:
+Bedrock **requires** US cross-region inference profiles (`us.anthropic.*`) for both Claude 4-series models we use — calling the bare foundation IDs returns *"Invocation of model ID … with on-demand throughput isn't supported. Retry your request with the ID or ARN of an inference profile."* Verified against live Bedrock in `us-east-1`.
 
-| Style | Model ID | Resource ARN |
-|---|---|---|
-| Single-region foundation model | `anthropic.claude-opus-4-6-20251008-v1:0` | `arn:aws:bedrock:us-east-1::foundation-model/...` |
-| US cross-region inference profile | `us.anthropic.claude-opus-4-6-20251008-v1:0` | adds `inference-profile/*` to IAM, routes across us-east-1/us-east-2/us-west-2 for capacity |
+Models in use (Bedrock-verified, 2026-05):
+- Chat loop: `us.anthropic.claude-opus-4-5-20251101-v1:0` — Bedrock's latest Opus. **Note: Claude Opus 4.6 exists on the Anthropic API but is not on Bedrock yet.** Opus 4.5 is the closest match.
+- Title gen: `us.anthropic.claude-haiku-4-5-20251001-v1:0`
 
-The demo runs single-region in `us-east-1` and the workload is tiny — capacity routing isn't worth the extra IAM surface and the operational gotcha of the inference-profile ARN. If we hit throttles later, the switch is one-character ID change plus an extra `inference-profile/*` resource pattern on the Bedrock IAM statement.
+IAM (in `backend-stack.ts`) grants `bedrock:InvokeModel` + `InvokeModelWithResponseStream` on two ARN patterns — the inference profile (account-scoped) and the underlying foundation model (account-agnostic; cross-region inference fans out to peer-region foundation models):
+```
+arn:aws:bedrock:*:${account}:inference-profile/us.anthropic.*
+arn:aws:bedrock:*::foundation-model/anthropic.*
+```
 
 ### File changes
 
-- `packages/backend/src/agent-runtime/anthropic.ts` — replaced the `AnthropicClient` class (which had no real instance state) with a module-level `client` singleton and an exported `chat()` free function. The SDK instance is constructed once per Lambda container instead of once per chat turn — warm-container HTTPS keep-alive carries over. `MODEL` constant: `claude-opus-4-6` → `anthropic.claude-opus-4-6-20251008-v1:0`. Also dropped the unused `LlmUsage` / `PRICING` / cost-tracking shape: `orchestrate.ts` only reads `message`, so `chat()` now returns `LlmAssistantMessage` directly.
-- `packages/backend/src/agent-runtime/generate-chat-title.ts` — same SDK swap. Model: `claude-haiku-4-5` → `anthropic.claude-haiku-4-5-20251001-v1:0`. SDK hoisted to module scope to match `anthropic.ts`.
+- `packages/backend/src/agent-runtime/anthropic.ts` — replaced the `AnthropicClient` class (which had no real instance state) with a module-level `client` singleton and an exported `chat()` free function. The SDK instance is constructed once per Lambda container instead of once per chat turn — warm-container HTTPS keep-alive carries over. `MODEL` constant: `claude-opus-4-6` → `us.anthropic.claude-opus-4-5-20251101-v1:0` (Bedrock's latest Opus; see "Model IDs and inference profiles" above). Also dropped the unused `LlmUsage` / `PRICING` / cost-tracking shape: `orchestrate.ts` only reads `message`, so `chat()` now returns `LlmAssistantMessage` directly.
+- `packages/backend/src/agent-runtime/generate-chat-title.ts` — same SDK swap. Model: `claude-haiku-4-5` → `us.anthropic.claude-haiku-4-5-20251001-v1:0`. SDK hoisted to module scope to match `anthropic.ts`.
 - `packages/backend/src/agent-runtime/orchestrate.ts` — `const { message } = await anthropic.chat(...)` → `const message = await chat(...)`.
-- `packages/backend/scripts/lib/backend-stack.ts` — add `bedrock:InvokeModel` + `bedrock:InvokeModelWithResponseStream` inline `PolicyStatement` on `arn:aws:bedrock:*::foundation-model/anthropic.*` to both the API Lambda and Worker Lambda roles (matches the inline `iot:Publish` style already in the file).
+- `packages/backend/scripts/lib/backend-stack.ts` — add `bedrock:InvokeModel` + `bedrock:InvokeModelWithResponseStream` inline `PolicyStatement` to both the API Lambda and Worker Lambda roles. Resources cover both the inference-profile ARN (account-scoped, `us.anthropic.*`) and the underlying foundation-model ARN (account-agnostic, used cross-region by the inference profile).
 - `packages/backend/src/env.d.ts` — remove `ANTHROPIC_API_KEY`.
 - `packages/backend/.env.sample` — drop the LLM-key block.
 - `packages/backend/.env.development`, `.env.production` (gitignored) — strip `ANTHROPIC_API_KEY` + `OPENAI_API_KEY`.
@@ -47,13 +50,12 @@ The demo runs single-region in `us-east-1` and the workload is tiny — capacity
 
 ## Operator pre-deploy checklist
 
-1. **Bedrock model access** — *AWS Console → Bedrock (us-east-1) → Model access* must have the Anthropic Claude models enabled. New accounts have to request access; one-time per-account toggle.
-2. **Exact model IDs are live in us-east-1**:
+1. **Anthropic use-case form** — *AWS Console → Bedrock (us-east-1) → Model access*: each Anthropic Claude model on Bedrock is gated behind a one-time per-account use-case form (request access → fill the Anthropic intake → wait for approval, usually ~15 minutes). Both Opus 4.5 and Haiku 4.5 must show "Access granted" before the deploy runs. The Bedrock API surfaces the missing-form case as: *"Model use case details have not been submitted for this account."*
+2. **Verify the inference profile resolves** in `us-east-1`. Smoke test against your own credentials:
    ```bash
-   aws bedrock list-foundation-models --region us-east-1 \
-     --query 'modelSummaries[?contains(modelId,`claude-opus-4-6`) || contains(modelId,`claude-haiku-4-5`)].modelId'
+   AWS_REGION=us-east-1 ./.tmp/bedrock-smoke.ts   # or any equivalent test invoke
    ```
-   Update the `MODEL` constants in `anthropic.ts` and `generate-chat-title.ts` if the dates differ from what's published.
+   Both `us.anthropic.claude-opus-4-5-20251101-v1:0` and `us.anthropic.claude-haiku-4-5-20251001-v1:0` should return `OK`. If Bedrock updates either model to a newer dated revision, swap the `MODEL` constants in `anthropic.ts` and `generate-chat-title.ts`.
 
 ## Verification
 

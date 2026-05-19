@@ -37,7 +37,7 @@ export async function runChatTurn(opts: {
     skillCalls: skillCallBuffer,
   });
 
-  const anthropic = new AnthropicClient(process.env.ANTHROPIC_API_KEY);
+  const anthropic = new AnthropicClient();
   const declarations = new TypescriptDeclarations(skills.declarations);
   const typeChecker = new TypeChecker(declarations.declarations);
   const codeExecutor = new CodeExecutor(typeChecker);
@@ -54,7 +54,7 @@ export async function runChatTurn(opts: {
 
   try {
     for (let step = 0; step < MAX_TURN_STEPS; step += 1) {
-      const { message } = await anthropic.chat({
+      const message = await anthropic.chat({
         system: systemPrompt,
         messages: history,
         tools,

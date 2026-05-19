@@ -1,7 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk";
-
 import { chatSessionsRepo } from "../chat-sessions/chat-sessions-repository.js";
 import { publishRealtimeEvent } from "../lib/realtime-publish.js";
+import { BEDROCK_MODEL, bedrockClient } from "./bedrock-client.js";
 
 const SYSTEM_PROMPT = `You label chat threads with a short, specific title.
 
@@ -45,9 +44,8 @@ export async function generateChatTitleInBackground(opts: {
 }
 
 async function generateTitle(userMessageText: string): Promise<string> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const response = await client.messages.create({
-    model: "claude-haiku-4-5",
+  const response = await bedrockClient.messages.create({
+    model: BEDROCK_MODEL,
     max_tokens: 64,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: userMessageText }],

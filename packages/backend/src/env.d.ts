@@ -1,7 +1,6 @@
 declare namespace NodeJS {
   interface ProcessEnv {
-    // LLM + skills
-    ANTHROPIC_API_KEY: string;
+    // Skills
     TAVILY_API_KEY: string;
 
     // Google OAuth (Cloud Console → APIs & Services → Credentials → OAuth client of type Web).

@@ -184,6 +184,13 @@ export class BackendStack extends cdk.Stack {
       actions: ["iot:Publish"],
       resources: ["*"],
     }));
+    fn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+      resources: [
+        `arn:aws:bedrock:*:${this.account}:inference-profile/global.anthropic.*`,
+        "arn:aws:bedrock:*::foundation-model/anthropic.*",
+      ],
+    }));
 
     const fnUrl = fnAlias.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,
@@ -235,6 +242,13 @@ export class BackendStack extends cdk.Stack {
     workerFn.addToRolePolicy(new iam.PolicyStatement({
       actions: ["iot:Publish"],
       resources: ["*"],
+    }));
+    workerFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+      resources: [
+        `arn:aws:bedrock:*:${this.account}:inference-profile/global.anthropic.*`,
+        "arn:aws:bedrock:*::foundation-model/anthropic.*",
+      ],
     }));
     agentMqttRole.grantAssumeRole(workerFn.role!);
 

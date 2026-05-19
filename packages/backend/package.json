@@ -15,6 +15,7 @@
     "ddb:bootstrap": "./scripts/ddb-local.ts bootstrap"
   },
   "dependencies": {
+    "@anthropic-ai/bedrock-sdk": "^0.29.1",
     "@anthropic-ai/sdk": "^0.78.0",
     "@aws-sdk/client-dynamodb": "^3.995.0",
     "@aws-sdk/client-iot": "^3.995.0",

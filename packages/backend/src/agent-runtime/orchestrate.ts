@@ -4,7 +4,7 @@ import type { ChatSessionMessageData } from "../lib/realtime-events.js";
 import { publishRealtimeEvent } from "../lib/realtime-publish.js";
 import { profilesRepo } from "../profiles/profiles-repository.js";
 import type { ProfileRow } from "../types/database.js";
-import { AnthropicClient } from "./anthropic.js";
+import { chat } from "./anthropic.js";
 import { CodeExecutor } from "./code-executor.js";
 import { rowsToLlmMessages } from "./convert.js";
 import { TypescriptDeclarations } from "./declarations.js";
@@ -37,7 +37,6 @@ export async function runChatTurn(opts: {
     skillCalls: skillCallBuffer,
   });
 
-  const anthropic = new AnthropicClient(process.env.ANTHROPIC_API_KEY);
   const declarations = new TypescriptDeclarations(skills.declarations);
   const typeChecker = new TypeChecker(declarations.declarations);
   const codeExecutor = new CodeExecutor(typeChecker);
@@ -54,7 +53,7 @@ export async function runChatTurn(opts: {
 
   try {
     for (let step = 0; step < MAX_TURN_STEPS; step += 1) {
-      const { message } = await anthropic.chat({
+      const message = await chat({
         system: systemPrompt,
         messages: history,
         tools,

@@ -5,7 +5,7 @@ import { publishRealtimeEvent } from "../lib/realtime-publish.js";
 
 const MODEL = "us.anthropic.claude-opus-4-7";
 
-const client = new AnthropicBedrock();
+const client = new AnthropicBedrock({ awsRegion: "us-east-1" });
 
 const SYSTEM_PROMPT = `You label chat threads with a short, specific title.
 

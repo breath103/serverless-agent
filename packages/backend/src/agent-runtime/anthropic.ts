@@ -7,7 +7,7 @@ import { executeCodeTool, type LlmToolDef } from "./tools.js";
 const MODEL = "us.anthropic.claude-opus-4-7";
 const MAX_TOKENS = 32_000;
 
-const client = new AnthropicBedrock();
+const client = new AnthropicBedrock({ awsRegion: "us-east-1" });
 
 /**
  * One Claude-on-Bedrock turn: stream-then-await-final, parse tool_use blocks

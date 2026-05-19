@@ -1,7 +1,9 @@
 import { AnthropicBedrock } from "@anthropic-ai/bedrock-sdk";
 
-// Pinned to us-east-1 — independent of the ambient AWS_REGION used by DDB/S3/IoT
-// clients (those target the app's region; Bedrock model availability dictates ours).
-export const bedrockClient = new AnthropicBedrock({ awsRegion: "us-east-1" });
+export const bedrockClient = new AnthropicBedrock();
 
-export const BEDROCK_MODEL = "us.anthropic.claude-opus-4-7";
+// `global.*` inference profile routes across every Bedrock region, so the call
+// works no matter where the SDK resolves its region from (Lambda runtime in
+// prod, ~/.aws/config in dev). Geo profiles (`us.*`, `eu.*`) would require
+// the caller to be in a specific source region.
+export const BEDROCK_MODEL = "global.anthropic.claude-opus-4-7";

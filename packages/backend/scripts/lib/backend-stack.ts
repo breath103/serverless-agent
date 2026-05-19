@@ -187,7 +187,7 @@ export class BackendStack extends cdk.Stack {
     fn.addToRolePolicy(new iam.PolicyStatement({
       actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
       resources: [
-        `arn:aws:bedrock:*:${this.account}:inference-profile/us.anthropic.*`,
+        `arn:aws:bedrock:*:${this.account}:inference-profile/global.anthropic.*`,
         "arn:aws:bedrock:*::foundation-model/anthropic.*",
       ],
     }));
@@ -246,7 +246,7 @@ export class BackendStack extends cdk.Stack {
     workerFn.addToRolePolicy(new iam.PolicyStatement({
       actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
       resources: [
-        `arn:aws:bedrock:*:${this.account}:inference-profile/us.anthropic.*`,
+        `arn:aws:bedrock:*:${this.account}:inference-profile/global.anthropic.*`,
         "arn:aws:bedrock:*::foundation-model/anthropic.*",
       ],
     }));

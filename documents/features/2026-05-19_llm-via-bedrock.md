@@ -18,18 +18,20 @@ No provider abstraction. The chat loop and title gen both call Bedrock directly.
 
 ### Model
 
-**`us.anthropic.claude-opus-4-7`** for both chat loop and title gen — verified live against `us-east-1` with `@anthropic-ai/bedrock-sdk`.
+**`global.anthropic.claude-opus-4-7`** for both chat loop and title gen — verified live with `@anthropic-ai/bedrock-sdk`.
 
 Why one model for both:
 - Opus 4.7 is Bedrock's current latest. Released Apr 16, 2026. Opus 4.6 (Anthropic API alias) was never published on Bedrock; the lineup goes 4.5 → 4.7.
 - Title gen is fire-and-forget on a 64-token output, so the cost delta between Opus and Haiku is dollars per thousand chats — irrelevant for a demo, and removes a second Bedrock approval from the deploy path.
-- The new 4.7 model ID format drops the date stamp and `-v1:0` suffix.
 
-Bedrock requires the `us.` (Geo) prefix — calling bare `anthropic.claude-opus-4-7` returns *"Invocation … with on-demand throughput isn't supported. Retry your request with the ID or ARN of an inference profile."* The Geo profile from `us-east-1` fans out across us-east-1/us-east-2/us-west-2 for capacity.
+Why **Global** (`global.*`), not **Geo** (`us.*`):
+- Bedrock requires an inference profile for these models — calling bare `anthropic.claude-opus-4-7` returns *"Invocation … with on-demand throughput isn't supported."*
+- A Geo profile (`us.*`) only accepts calls from a fixed set of source regions (us-east-1/us-east-2/us-west-1/us-west-2/ca-central-1/ca-west-1). Local dev from a developer whose AWS profile defaults to a non-US region would fail.
+- A Global profile routes from every Bedrock-supported region. The SDK can resolve its region from any chain (Lambda runtime env, `~/.aws/config`, etc.) and the call still lands. **No `awsRegion` hardcode needed on the client.**
 
-IAM (in `backend-stack.ts`) grants `bedrock:InvokeModel` + `InvokeModelWithResponseStream` on two ARN patterns — the inference profile (account-scoped) and the underlying foundation model (account-agnostic, used cross-region by the profile):
+IAM (in `backend-stack.ts`) grants `bedrock:InvokeModel` + `InvokeModelWithResponseStream` on two ARN patterns — the Global inference profile (account-scoped) and the underlying foundation model (account-agnostic, fanned out cross-region by the profile):
 ```
-arn:aws:bedrock:*:${account}:inference-profile/us.anthropic.*
+arn:aws:bedrock:*:${account}:inference-profile/global.anthropic.*
 arn:aws:bedrock:*::foundation-model/anthropic.*
 ```
 
@@ -48,17 +50,17 @@ arn:aws:bedrock:*::foundation-model/anthropic.*
 
 | Environment | Credentials |
 |---|---|
-| Local dev | `~/.aws/credentials` / `AWS_PROFILE` from the existing chain (same one used for DynamoDB, S3, IoT). If your profile's default region isn't `us-east-1`, export `AWS_REGION=us-east-1` before `./scripts/dev.ts start`. |
+| Local dev | `~/.aws/credentials` / `AWS_PROFILE` from the existing chain. No region setup needed — the Global profile routes from any region the SDK resolves. |
 | Lambda (prod) | Execution role, scoped by the inline Bedrock IAM statement. |
 
 ## Operator pre-deploy checklist
 
-1. **Anthropic use-case form** — *AWS Console → Bedrock (us-east-1) → Model access*: enable **Claude Opus 4.7** for the deploying account. New accounts have to fill the Anthropic intake form once; approval is usually ~15 min. Without it Bedrock returns `Model use case details have not been submitted for this account`.
+1. **Anthropic use-case form** — *AWS Console → Bedrock → Model access*: enable **Claude Opus 4.7** for the deploying account. New accounts have to fill the Anthropic intake form once; approval is usually ~15 min. Without it Bedrock returns `Model use case details have not been submitted for this account`.
 2. **Verify with a real Bedrock call**:
    ```bash
-   AWS_REGION=us-east-1 ./.tmp/bedrock-smoke.ts
+   ./.tmp/bedrock-smoke.ts
    ```
-   `us.anthropic.claude-opus-4-7` should return `OK`.
+   `global.anthropic.claude-opus-4-7` should return `OK`.
 
 ## Non-goals
 

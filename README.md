@@ -1,8 +1,14 @@
 # Serverless Agent
 
-An open-source demo showing that a full agent application — chat UI, tool-using LLM runtime, memory store, realtime browser updates — can run **entirely on AWS serverless primitives**. No managed Postgres, no custom domain, no third-party auth SaaS.
+> 한국어 버전: **[README.ko.md](./README.ko.md)**
 
-A clean, minimal demo. Most of the plumbing compiles and both CI jobs are green locally — **but nothing has been deployed to AWS yet**, so the end-to-end path has not been exercised. See "State of play" below.
+Example repo for the **AWS Summit Korea — DEV308** session *맥 미니 없이도 서버리스로 만드는 AI Cloud Agent*. Speaker: 이상현 (Mirror).
+
+A cloud agent implementation that runs on AWS serverless components only (Lambda, DynamoDB, S3, IoT Core, CloudFront). Includes a chat UI, an LLM loop with tool calling, persistent memory, and realtime browser updates. The AWS infrastructure is effectively unbilled while idle (LLM API costs are separate).
+
+![Web UI and Telegram mirror](./documents/images/agent-web-and-telegram.png)
+
+*Same chat session shown in the web UI (left) and mirrored to a Telegram bot (right). Tool-call progress streams live to both surfaces.*
 
 ---
 
@@ -13,26 +19,52 @@ Browser
   │
   ▼
 CloudFront (default *.cloudfront.net host)
-  │    ├─ S3  ← static React SPA
-  │    └─ Lambda@Edge (origin-request)
-  │         │
-  │         └─ /api/* → Backend Function URL (looked up in SSM)
-  │                      │
-  │                      ▼
-  │                   Hono on Lambda
-  │                      │
-  │    ┌─────────────────┼──────────────────┐
-  │    ▼                 ▼                  ▼
-  │  DynamoDB      S3 (agent files)   AWS IoT Core (MQTT)
-  │  (6 tables)                        │
-  └──── realtime row updates ◄─────────┘
+  │    ├─ S3                 ← static React SPA + SPA index.html fallback
+  │    └─ Lambda@Edge        ← origin-request rewrites /api/* → backend Function URL
+  │           │                (URL read from SSM, cached 60s)
+  │           ▼
+  │       Backend Lambda (Hono, Node.js 24)
+  │           │
+  │  ┌────────┼─────────────┬──────────────────┐
+  │  ▼        ▼             ▼                  ▼
+  │ DynamoDB  S3            Agent Runtime      AWS IoT Core
+  │ (7 tables)(agent files) (LLM loop +        (MQTT topic per
+  │  │         │             sandbox + skills)  user/session)
+  │  │         │             │                  │
+  │  └─────────┴─────────────┴──────────────────┘
+  │                          │
+  └── realtime DB-row deltas ◄┘
+      (browser subscribes via WSS)
 ```
 
-- **Edge** — single CloudFront distribution, default `*.cloudfront.net` cert. Lambda@Edge at origin-request reads the backend URL from SSM and rewrites `/api/*` traffic to it. Everything else is served from S3 (SPA index.html fallback for unknown paths).
-- **Backend** — Node.js 24 Lambda running Hono (`packages/backend/src/lambda-api/`).
-- **Agent runtime** — in `packages/backend/src/agent-runtime/`. One tool (`executeCode`) that runs TypeScript in a sandbox with typed skill bindings: `memory`, `webSearch`, `audio`, `url`, `llm`. Skill calls are traced via a Proxy for UI rendering.
-- **Storage** — every entity is its own DynamoDB table declared in the CDK stack (`packages/backend/scripts/lib/backend-stack.ts`). Pay-per-request. Attribute naming is snake_case to match the TS row shapes in `packages/backend/src/types/database.ts`.
-- **Auth** — username + password; scrypt hashing; HTTP-only session cookie (`sa_session`); sessions table with DynamoDB TTL. See `packages/backend/src/auth/`.
+**Edge — CloudFront + Lambda@Edge.** One CloudFront distribution. Static assets come from S3. `/api/*` requests trigger a Lambda@Edge function at origin-request (`packages/edge/src/origin-request/`) that reads the backend Function URL from SSM Parameter Store and rewrites the request. The SSM lookup is cached for 60s in the Lambda instance's memory. Uses the default `*.cloudfront.net` hostname (no Route53, no ACM).
+
+**Backend — Lambda + Hono.** `packages/backend/src/lambda-api/` is a Hono app deployed as a single Lambda behind a Function URL. REST routes live under `/api/auth/*`, `/api/chat-sessions/*`, etc.
+
+**Agent runtime — LLM loop in Lambda.** `packages/backend/src/agent-runtime/`. The LLM is given one tool, `executeCode`, which runs TypeScript inside a sandbox. The sandbox exposes typed bindings to the skills under `skill-runtimes/` (`memory`, `web-search`, `google-calendar`). Every skill call goes through a Proxy that emits a trace event; the UI uses those events to render tool-call cards.
+
+**Storage — DynamoDB.** Seven tables declared in `packages/backend/scripts/lib/backend-stack.ts`: `users`, `sessions`, `profiles`, `memories`, `chat-sessions`, `chat-messages`, `user-skills`. On-demand pricing, PITR on. The `sessions` table has DynamoDB TTL on `expires_at_epoch`. Repos under `src/<domain>/*-repository.ts` go through the DocumentClient singleton in `src/lib/ddb.ts`. Table names are injected as env vars by CDK.
+
+**Files — S3.** Agent-generated artifacts (transcripts, downloads) live in a bucket separate from the SPA. Pre-signed URLs on read.
+
+**Realtime — AWS IoT Core.** Managed MQTT broker reachable from the browser over WSS using a SigV4-signed URL. The Lambda agent loop publishes events (tool-call start/end, message chunks, DDB row updates) to a per-user MQTT topic; the React app subscribes with a temporary credential from `/api/realtime/credentials`. Event shapes live in `src/lib/realtime-events.ts` and are shared with the frontend.
+
+**Auth — scrypt + cookie sessions.** `POST /api/auth/sign-{in,up,out}`. scrypt for password hashing. `sa_session` cookie: HTTP-only, SameSite=Lax, Secure. Session rows in DDB with TTL. See `packages/backend/src/auth/`.
+
+---
+
+## Request lifecycle (one chat message)
+
+1. First page load: Browser → CloudFront → S3 (static).
+2. Send message: Browser `POST /api/chat-sessions/:id/messages` → CloudFront → Lambda@Edge rewrites to the backend Function URL → backend Lambda.
+3. Backend Lambda writes the user message to DDB, returns 200, and starts the agent run for that session asynchronously.
+4. Agent runtime reads context from DDB (recent messages, profile, memories) and calls Anthropic with `executeCode` as the only tool.
+5. The LLM-written TypeScript is type-checked via the TypeScript compiler API. Type errors are surfaced back to the LLM for a retry.
+6. The code runs in the sandbox. Inside, `await webSearch.query(...)` hits Tavily, `await memory.upsert(...)` writes to DDB. Each call is traced and published as an MQTT event; messages and tool-call state are written to DDB as they happen.
+7. Browser receives the MQTT events and re-renders message rows and tool-call cards. No polling.
+8. Agent writes the final assistant message to DDB, publishes a final event, and the Lambda goes idle.
+
+Per request, the infrastructure used is: 1 Lambda function, 7 DDB tables, 1 S3 bucket, 1 IoT topic per user, 1 CloudFront distribution.
 
 ---
 
@@ -43,22 +75,24 @@ packages/
   backend/
     scripts/lib/backend-stack.ts     ← CDK: Lambda, S3, DynamoDB tables
     src/
-      auth/                          ← scrypt + cookie sessions (replaces better-auth)
+      auth/                          ← scrypt + cookie sessions
       users/                         ← users-repository on DynamoDB
       profiles/                      ← profiles-repository on DynamoDB
       memories/                      ← memories-repository on DynamoDB
       chat-sessions/                 ← chat sessions + messages on DynamoDB
+      skills/                        ← OAuth skill definitions (Google, etc.) on DynamoDB
+      channels/                      ← Telegram channel dispatcher
       agent-runtime/                 ← LLM loop, sandbox, skill runtime
-        skill-runtimes/              ← the six live skills
+        skill-runtimes/              ← skills (memory, web-search, google-calendar)
       lambda-api/                    ← Hono routes
       lib/
         ddb.ts                       ← DocumentClient singleton + table-name env lookup
         realtime-events.ts           ← MQTT event shapes (shared with frontend)
-      types/database.ts              ← plain TS row types (no Kysely)
+      types/database.ts              ← TS row types
   frontend/                          ← Vite + React + TanStack Router
   edge/
     scripts/lib/edge-stack.ts        ← CDK: CloudFront + Lambda@Edge + S3
-    src/origin-request/              ← routes /api/* → backend URL
+    src/origin-request/              ← routes /api/* → backend Function URL
   shared/                            ← config loader, SSM naming
 scripts/
   dev.ts                             ← start/stop dev servers
@@ -67,45 +101,13 @@ scripts/
 
 ---
 
-## State of play
-
-### Done (committed, `main` @ `5cb1f32`)
-
-- DNS / Route53 / ACM / custom-domain wiring **removed** from both edge and backend stacks.
-- **Six DynamoDB tables** declared in `packages/backend/scripts/lib/backend-stack.ts` (users, sessions, profiles, memories, chat-sessions, chat-messages). Pay-per-request, point-in-time recovery on, sessions table has TTL on `expires_at_epoch`.
-- **All repos rewritten** to use the AWS SDK v3 DocumentClient via `src/lib/ddb.ts`. Table names come from `TABLE_*` env vars injected by the CDK stack.
-- **Auth replaced.** `POST /api/auth/sign-{in,up,out}` + `GET /api/auth/session`. Cookie: `sa_session`, HttpOnly, SameSite=Lax, Secure.
-- **Frontend auth** rewritten: `packages/frontend/src/lib/auth-client.ts` is a thin fetch wrapper; `AuthContext` re-fetches session on mount. Login page has both sign-in and sign-up modes.
-- **Cut features**: ontology, billable-usage, radar, Google/Slack/Telegram skills, user-skills OAuth, Supabase CLI scripts, seed-persona, SQL migrations, telegram webhook tunnel, landing-page marketing copy left as-is for now.
-- `.env.*` files **deleted** (they contained live API keys for Anthropic, OpenAI, Google, Tavily, PostHog). Added `.env.sample` templates.
-- CI workflow (`.github/workflows/deploy.yml`) reduced to a check-only job on `ubuntu-latest` — no deploy step, no Telegram notify.
-- **Both CI jobs green locally**: `backend build-types + lint + test` and `frontend build-types + lint + test`.
-
-### Not yet verified / not done
-
-These all compile and the types line up, but nobody has actually run them against AWS yet:
-
-- **CDK synth**. I haven't run `cdk synth` or `cdk deploy` for either stack. Regional / cross-region / Lambda@Edge quirks could surface at deploy time.
-- **Real DynamoDB I/O.** The repo layer has never been exercised. BatchGet chunking (100-key cap) and the "scan all then sort/filter in memory" pattern in `memories` is fine for a demo but will need pagination tweaks for anything real.
-- **Cross-region backend URL lookup.** The edge stack's SSM policy allows reading `/${project}/backend/*`, and origin-request caches the lookup for 60s. Not tested end-to-end.
-- **Agent runtime** still calls Anthropic + Tavily + AWS IoT. None of these are tested with real keys on this branch. `AGENT_MQTT_*` env vars are still required for the handler to start.
-- **Dev server** (`./scripts/dev.ts start`) has not been run on this repo since the rewrite. Likely broken without a stubbed `.env.development` for backend + frontend.
-- **No DynamoDB Local fallback.** The repos hit real AWS. For local dev you'll either need AWS creds pointed at real tables, or wire in DynamoDB Local + a custom endpoint in `src/lib/ddb.ts`.
-- **Frontend routes for deleted features.** I removed `/dashboard/radars`, `/dashboard/settings/usage`, `/dashboard/settings/skills` from the sidebar and route tree, but a few supporting components / helpers might still be in the tree unused. Run knip on the frontend if this matters.
-- **No integration tests.** Existing unit tests are placeholders. `src/__tests__/agent.test.ts` is entirely TODO stubs from the old codebase.
-- **`.claude/` skills + rules** still reference the previous Supabase flow in a couple places. Non-blocking; update as you go.
-- **`TSS_README.md`, `opencode.json`** kept as-is from the template. Delete or update if irrelevant.
-- **Tests have 2 lint warnings** (pre-existing): `memory-content-editor` tailwind class, `react-hook-form` `watch()` in `ProfilePageLoaded`. Not errors.
-
----
-
-## Getting started
+## Running it
 
 ### Prerequisites
 
 - Node 24 (see `.nvmrc`)
-- AWS credentials (for DDB, IoT, S3, Lambda, CloudFront, SSM)
-- API keys: Anthropic (required), Tavily (required for web-search), OpenAI (for audio)
+- AWS credentials (DynamoDB, IoT, S3, Lambda, CloudFront, SSM)
+- API keys: Anthropic (LLM), Tavily (web search)
 
 ### One-time project config
 
@@ -113,27 +115,27 @@ These all compile and the types line up, but nobody has actually run them agains
 cp .env.sample .env
 cp packages/backend/.env.sample packages/backend/.env.development
 cp packages/frontend/.env.sample packages/frontend/.env.development
-# Fill in keys in each
+# Fill in the keys.
 ```
 
-Edit `tss.json` → change `project` and `repo` to your values.
+Edit `tss.json` and set `project` and `repo` to your values.
 
-### Local development
+### Local dev
 
-All scripts are executable — no `npm run` needed.
+All scripts are executable — run them directly.
 
 ```bash
 npm install
 ./scripts/dev.ts start        # backend + frontend + edge proxy in the background
-./scripts/dev.ts status       # current state + edge proxy URL
+./scripts/dev.ts status       # state + edge proxy URL
 ./scripts/dev.ts stop
 ```
 
-Access the app only through the edge-proxy URL printed by `start`.
+Access the app through the edge proxy URL printed by `start` — that mirrors the production CloudFront → Lambda@Edge → backend flow.
 
-**Caveat**: the dev backend talks to real DynamoDB tables named by your `.env.development`'s `TABLE_*` vars. You'll want a separate `-dev` suffix on those, or swap in DynamoDB Local (see "Known TODOs" below).
+The dev backend talks to real DynamoDB tables (named by `TABLE_*` in `.env.development`). Use a `-dev` suffix or wire in DynamoDB Local.
 
-### CI parity (run before committing)
+### CI parity (before pushing)
 
 ```bash
 ./packages/backend/scripts/build-types.ts \
@@ -146,39 +148,122 @@ Access the app only through the edge-proxy URL printed by `start`.
   && npm test -w frontend
 ```
 
-**Never run `tsc` or `npx tsc` directly** — always use the `build-types.ts` scripts. See `CLAUDE.md` for why.
+Don't run `tsc` directly — go through the `build-types.ts` scripts. See `CLAUDE.md`.
 
-### Deploying
+### Deploy
 
 ```bash
 ./packages/edge/scripts/deploy.ts deploy              # CloudFront + Lambda@Edge + S3
-./packages/backend/scripts/deploy.ts --env=production # backend Lambda + DDB tables + worker
+./packages/backend/scripts/deploy.ts --env=production # backend Lambda + DDB tables
 ./packages/frontend/scripts/deploy.ts --env=production
 ```
 
-Deploy order matters the first time: edge creates the S3 bucket the frontend deploys into, and backend writes its Function URL into SSM where the edge Lambda@Edge reads from.
+Order matters on the first deploy: edge creates the S3 bucket the frontend deploys into, and the backend writes its Function URL into SSM where the Lambda@Edge function later reads it. Lambda@Edge is `us-east-1` only; the backend can live in any region.
 
 ---
 
-## Known TODOs (good first commits)
+## Testing integrations locally
 
-1. **Do a real CDK synth + deploy.** Expect to hit one or two permission / region issues (Lambda@Edge is locked to `us-east-1`; backend can be anywhere).
-2. **Seed a first user.** There's no "create admin" path — just open the app and use the sign-up form.
-3. **Delete stale `.claude/` skills** that reference Supabase flows, or port them to the new DynamoDB setup.
-4. **Write at least one integration test** that spins up DynamoDB Local and exercises `usersRepo.create` → `signIn` → `signOut`. The unit tests in place today are TODO stubs from the old project.
-5. **Consider swapping AWS IoT for a simpler realtime** (Server-Sent Events from Lambda, or polling) if you want the demo to be truly zero-extra-setup. IoT works but the cert + MQTT wiring is heavy for a demo.
+Replace `<edge>` below with the edge proxy URL printed by `./scripts/dev.ts start` (default `http://localhost:3000`, configurable in `tss.json`).
+
+### Calling the API as an authed user
+
+In dev (`NODE_ENV=development`), pass `X-Dev-Role: user` to skip the cookie session and authenticate as the dev user.
+
+```bash
+curl -H "X-Dev-Role: user" <edge>/api/chat-sessions
+```
+
+The header is rejected in production builds.
+
+### Google Calendar (OAuth)
+
+The callback URL is derived from the request host, so for local dev register `<edge>/api/skills/oauth/callback` as the redirect URI on your OAuth client.
+
+1. **Create an OAuth client** — Google Cloud Console → APIs & Services → Credentials → *Create Credentials* → *OAuth client ID* → application type **Web**.
+   - Authorized JavaScript origin: `<edge>` (e.g. `http://localhost:3000`)
+   - Authorized redirect URI: `<edge>/api/skills/oauth/callback`
+2. **Enable the Google Calendar API** for the same project (APIs & Services → Library).
+3. **Add the client ID/secret** to `packages/backend/.env.development`:
+   ```bash
+   GOOGLE_CLIENT_ID="…apps.googleusercontent.com"
+   GOOGLE_CLIENT_SECRET="…"
+   ```
+4. Restart dev: `./scripts/dev.ts stop && ./scripts/dev.ts start`.
+5. In the UI: Settings → Skills → *Connect Google Calendar*. The OAuth round-trip writes access + refresh tokens into the `user-skills` DDB row; the agent runtime refreshes expired tokens.
+
+Tokens are stored only in DynamoDB, never in env files or git.
+
+### Telegram (real BotFather bot)
+
+Telegram doesn't deliver webhooks to `localhost`, so a public HTTPS URL is needed. The install route skips `setWebhook` in dev unless `EDGE_PUBLIC_URL` is set. A `cloudflared` quick tunnel works for the full round-trip against a real bot.
+
+```bash
+# 1. Open a tunnel to the edge proxy. Prints a public URL.
+#    (cloudflared from Homebrew. No login needed for `--url`.)
+cloudflared tunnel --url <edge> --no-autoupdate
+#    → https://<random-words>.trycloudflare.com
+
+# 2. Add the URL to packages/backend/.env.development:
+#    EDGE_PUBLIC_URL="https://<random-words>.trycloudflare.com"
+
+# 3. Restart dev so the backend reads it at startup:
+./scripts/dev.ts stop && ./scripts/dev.ts start
+
+# 4. Sanity check:
+curl https://<random-words>.trycloudflare.com/api/health
+
+# 5. Create a bot via @BotFather (/newbot → name → @handle → token).
+
+# 6. UI → Settings → Skills → Connect Telegram → paste the token.
+#    The install route calls setWebhook against the tunnel URL.
+
+# 7. DM the bot. A chat appears in the sidebar; the agent's reply goes back to Telegram.
+
+# 8. Disconnect from the UI when done — calls deleteWebhook and removes the row.
+```
+
+Notes:
+- `cloudflared --url` tunnels are ephemeral. Restarting `cloudflared` gives a new URL — update `EDGE_PUBLIC_URL` and restart dev, otherwise Telegram is pointing at a dead tunnel.
+- The bot token is stored in the `user-skills` DDB row only, not in env files.
+
+### E2E browser testing
+
+A headless-Chrome harness drives the SPA via CDP, separate from the dev server.
+
+```bash
+./scripts/e2e.ts start                  # start headless Chrome (CDP endpoint in .e2e-status.json)
+./scripts/e2e.ts login                  # authenticate as the dev user
+./scripts/e2e.ts navigate /dashboard
+./scripts/e2e.ts screenshot             # → .tmp/screenshot-<ts>.png
+./scripts/e2e.ts run-js "document.title"
+./scripts/e2e.ts click ".button"
+./scripts/e2e.ts type "input" "text"
+./scripts/e2e.ts wait ".loaded"
+./scripts/e2e.ts page-text
+./scripts/e2e.ts stop
+```
+
+The Chrome instance persists across commands via CDP.
 
 ---
 
-## Useful pointers
+## Adding to the system
 
-- **Adding a new DynamoDB table** — declare it in `packages/backend/scripts/lib/backend-stack.ts`, add to `allTables` and `tableEnv`, add a name getter to `src/lib/ddb.ts`, add the row type to `src/types/database.ts`, write a repo next to the existing ones.
-- **Adding a new route** — `src/lambda-api/routes/<name>.ts`, export `routes`, then spread into `src/lambda-api/routes/index.ts`. Use `c.get("requireUser")()` to enforce auth.
-- **Adding a new skill** — `src/agent-runtime/skill-runtimes/<name>.ts` using `defineSkillRuntime`, register in `skill-runtimes/index.ts` and `skills/builtins.ts`, then **run `./packages/backend/scripts/generate-declarations.ts`** — the agent sees skills via the generated `.d.ts`, typecheck alone won't catch a stale declaration.
-- **Frontend talks to backend types directly** via the `@backend/*` path alias. Cross-package type breakage only surfaces in the frontend typecheck — always run both.
+- **A new DynamoDB table** — declare it in `packages/backend/scripts/lib/backend-stack.ts`, add it to `allTables` and `tableEnv`, add a name getter in `src/lib/ddb.ts`, add the row type to `src/types/database.ts`, write a repo next to the existing ones.
+- **A new HTTP route** — `src/lambda-api/routes/<name>.ts`, export `routes`, spread into `src/lambda-api/routes/index.ts`. Use `c.get("requireUser")()` for auth.
+- **A new agent skill** — `src/agent-runtime/skill-runtimes/<name>.ts` using `defineSkillRuntime`, register in `skill-runtimes/index.ts` and `skills/builtins.ts`, then run `./packages/backend/scripts/generate-declarations.ts`. The LLM sees skills via the generated `.d.ts`; a typecheck alone won't catch a stale declaration.
+
+The frontend imports backend types directly via the `@backend/*` path alias, so cross-package type breakage only surfaces in the frontend typecheck — run both.
+
+---
+
+## Status
+
+Compiles. Both CI jobs green locally. The architecture above matches the code. Not yet deployed end-to-end to AWS at the time of the talk — the session covers the deploy path and the gotchas (Lambda@Edge region pinning, cross-region SSM, IoT Core SigV4).
 
 ---
 
 ## License
 
-MIT (intent — add a `LICENSE` file when you're ready to make the repo public).
+MIT (intent — `LICENSE` to be added when the repo goes public).

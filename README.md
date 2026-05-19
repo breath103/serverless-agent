@@ -14,34 +14,15 @@ A cloud agent implementation that runs on AWS serverless components only (Lambda
 
 ## Architecture
 
-```
-Browser
-  │
-  ▼
-CloudFront (default *.cloudfront.net host)
-  │    ├─ S3                 ← static React SPA + SPA index.html fallback
-  │    └─ Lambda@Edge        ← origin-request rewrites /api/* → backend Function URL
-  │           │                (URL read from SSM, cached 60s)
-  │           ▼
-  │       Backend Lambda (Hono, Node.js 24)
-  │           │
-  │  ┌────────┼─────────────┬──────────────────┐
-  │  ▼        ▼             ▼                  ▼
-  │ DynamoDB  S3            Agent Runtime      AWS IoT Core
-  │ (7 tables)(agent files) (LLM loop +        (MQTT topic per
-  │  │         │             sandbox + skills)  user/session)
-  │  │         │             │                  │
-  │  └─────────┴─────────────┴──────────────────┘
-  │                          │
-  └── realtime DB-row deltas ◄┘
-      (browser subscribes via WSS)
-```
+![Architecture](./documents/images/architecture.png)
 
 **Edge — CloudFront + Lambda@Edge.** One CloudFront distribution. Static assets come from S3. `/api/*` requests trigger a Lambda@Edge function at origin-request (`packages/edge/src/origin-request/`) that reads the backend Function URL from SSM Parameter Store and rewrites the request. The SSM lookup is cached for 60s in the Lambda instance's memory. Uses the default `*.cloudfront.net` hostname (no Route53, no ACM).
 
-**Backend — Lambda + Hono.** `packages/backend/src/lambda-api/` is a Hono app deployed as a single Lambda behind a Function URL. REST routes live under `/api/auth/*`, `/api/chat-sessions/*`, etc.
+**API Lambda — Hono.** `packages/backend/src/lambda-api/` is a Hono app deployed as the API Lambda behind a Function URL. REST routes live under `/api/auth/*`, `/api/chat-sessions/*`, etc. On chat-message routes it writes to DDB, async-invokes the Worker Lambda, and returns immediately so the HTTP request doesn't block on the LLM run.
 
-**Agent runtime — LLM loop in Lambda.** `packages/backend/src/agent-runtime/`. The LLM is given one tool, `executeCode`, which runs TypeScript inside a sandbox. The sandbox exposes typed bindings to the skills under `skill-runtimes/` (`memory`, `web-search`, `google-calendar`). Every skill call goes through a Proxy that emits a trace event; the UI uses those events to render tool-call cards.
+**Worker Lambda — agent loop.** `packages/backend/src/worker/`. Async-invoked by the API for each turn. Runs the LLM loop, executes the sandboxed TypeScript, publishes progress events to MQTT, and writes outputs to DDB.
+
+**Agent runtime — LLM loop in the Worker.** `packages/backend/src/agent-runtime/`. The LLM (Bedrock) is given one tool, `executeCode`, which runs TypeScript inside a sandbox. The sandbox exposes typed bindings to the skills under `skill-runtimes/` (`memory`, `web-search`, `google-calendar`). Every skill call goes through a Proxy that emits a trace event; the UI uses those events to render tool-call cards.
 
 **Storage — DynamoDB.** Seven tables declared in `packages/backend/scripts/lib/backend-stack.ts`: `users`, `sessions`, `profiles`, `memories`, `chat-sessions`, `chat-messages`, `user-skills`. On-demand pricing, PITR on. The `sessions` table has DynamoDB TTL on `expires_at_epoch`. Repos under `src/<domain>/*-repository.ts` go through the DocumentClient singleton in `src/lib/ddb.ts`. Table names are injected as env vars by CDK.
 
@@ -57,14 +38,14 @@ CloudFront (default *.cloudfront.net host)
 
 1. First page load: Browser → CloudFront → S3 (static).
 2. Send message: Browser `POST /api/chat-sessions/:id/messages` → CloudFront → Lambda@Edge rewrites to the backend Function URL → backend Lambda.
-3. Backend Lambda writes the user message to DDB, returns 200, and starts the agent run for that session asynchronously.
-4. Agent runtime reads context from DDB (recent messages, profile, memories) and calls Anthropic with `executeCode` as the only tool.
+3. API Lambda writes the user message to DDB, async-invokes the Worker Lambda for that session, and returns 200.
+4. Worker Lambda reads context from DDB (recent messages, profile, memories) and calls Bedrock with `executeCode` as the only tool.
 5. The LLM-written TypeScript is type-checked via the TypeScript compiler API. Type errors are surfaced back to the LLM for a retry.
 6. The code runs in the sandbox. Inside, `await webSearch.query(...)` hits Tavily, `await memory.upsert(...)` writes to DDB. Each call is traced and published as an MQTT event; messages and tool-call state are written to DDB as they happen.
 7. Browser receives the MQTT events and re-renders message rows and tool-call cards. No polling.
-8. Agent writes the final assistant message to DDB, publishes a final event, and the Lambda goes idle.
+8. Worker writes the final assistant message to DDB, publishes a final event, and goes idle.
 
-Per request, the infrastructure used is: 1 Lambda function, 7 DDB tables, 1 S3 bucket, 1 IoT topic per user, 1 CloudFront distribution.
+Per request, the infrastructure used is: 2 Lambda functions (API + Worker), 7 DDB tables, 1 S3 bucket, 1 IoT topic per user, 1 CloudFront distribution.
 
 ---
 
@@ -84,7 +65,8 @@ packages/
       channels/                      ← Telegram channel dispatcher
       agent-runtime/                 ← LLM loop, sandbox, skill runtime
         skill-runtimes/              ← skills (memory, web-search, google-calendar)
-      lambda-api/                    ← Hono routes
+      lambda-api/                    ← API Lambda entry — Hono routes
+      worker/                        ← Worker Lambda entry — agent loop, async-invoked
       lib/
         ddb.ts                       ← DocumentClient singleton + table-name env lookup
         realtime-events.ts           ← MQTT event shapes (shared with frontend)
@@ -107,7 +89,8 @@ scripts/
 
 - Node 24 (see `.nvmrc`)
 - AWS credentials (DynamoDB, IoT, S3, Lambda, CloudFront, SSM)
-- API keys: Anthropic (LLM), Tavily (web search)
+- LLM via AWS Bedrock (uses AWS credentials, no separate API key)
+- Tavily API key for web search
 
 ### One-time project config
 

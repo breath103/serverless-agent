@@ -4,7 +4,7 @@ import type { MessageParam, TextBlockParam, ToolResultBlockParam, ToolUseBlockPa
 import type { LlmAssistantContentBlock, LlmAssistantMessage, LlmMessage } from "./llm-message.js";
 import { executeCodeTool, type LlmToolDef } from "./tools.js";
 
-const MODEL = "us.anthropic.claude-opus-4-5-20251101-v1:0";
+const MODEL = "us.anthropic.claude-opus-4-7";
 const MAX_TOKENS = 32_000;
 
 const client = new AnthropicBedrock();

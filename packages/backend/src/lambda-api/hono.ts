@@ -14,6 +14,7 @@ import {
 } from "../auth/index.js";
 import { sessionsRepo } from "../auth/sessions-repository.js";
 import type { AppEnv } from "../lib/app-context.js";
+import { ddbTables } from "../lib/ddb.js";
 import { warning } from "../lib/developer-warning.js";
 import { registerToHono } from "../lib/hono-adapter.js";
 import { telemetry } from "../lib/telemetry.js";
@@ -57,6 +58,21 @@ if (process.env.NODE_ENV === "development") {
     await sessionsRepo.create({ id: sessionId, userId: "dev-admin", expiresAt });
     setSessionCookie(c, sessionId, expiresAt);
     return c.json({ ok: true });
+  });
+
+  // Dev-only: set the dev-admin user's credit balance. Used by the
+  // out-of-credit e2e scenario to drain credits before driving the UI and
+  // restore them in the cleanup block.
+  app.post("/api/dev/set-credits", async (c) => {
+    // eslint-disable-next-line @typescript-eslint/no-restricted-types -- untyped JSON body, narrowed below
+    const body = await c.req.json().catch(() => ({})) as { credits?: unknown };
+    if (typeof body.credits !== "number") throw new HTTPException(400, { message: "credits_must_be_number" });
+    await ddbTables.users.update({
+      key: { id: "dev-admin" },
+      updateExpression: "SET credits = :c, updated_at = :u",
+      expressionAttributeValues: { ":c": body.credits, ":u": new Date().toISOString() },
+    });
+    return c.json({ ok: true, credits: body.credits });
   });
 }
 

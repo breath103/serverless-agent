@@ -24,6 +24,20 @@ class UsersRepository {
     await this.table.put(row, { conditionExpression: "attribute_not_exists(id)" });
     return row;
   }
+
+  /**
+   * Atomically deduct 1 credit. Returns the updated row, or `null` when the
+   * user is at 0 credits (DDB conditional check fails). Race-safe — two
+   * concurrent calls at `credits: 1` see exactly one success.
+   */
+  async decrementCredits(id: string): Promise<UserRow | null> {
+    return this.table.updateIf({
+      key: { id },
+      updateExpression: "SET credits = credits - :one, updated_at = :u",
+      conditionExpression: "credits >= :one",
+      expressionAttributeValues: { ":one": 1, ":u": new Date().toISOString() },
+    });
+  }
 }
 
 export const usersRepo = new UsersRepository(ddbTables.users);

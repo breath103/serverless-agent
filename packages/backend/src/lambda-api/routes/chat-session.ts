@@ -7,10 +7,12 @@ import { chatSessionsRepo } from "../../chat-sessions/chat-sessions-repository.j
 import { route } from "../../lib/app-context.js";
 import { publishRealtimeEvent } from "../../lib/realtime-publish.js";
 import { requireOrThrow } from "../../lib/require-or-throw.js";
+import { usersRepo } from "../../users/users-repository.js";
 
 const MESSAGE_MAX = 4096;
 const chatNotFound = () => new HTTPException(404, { message: "Chat not found" });
 const chatBusy = () => new HTTPException(409, { message: "Chat not found or already generating" });
+const outOfCredit = () => new HTTPException(402, { message: "out_of_credit" });
 
 export const routes = [
   /** Create a new chat session seeded with an initial user message. */
@@ -20,6 +22,7 @@ export const routes = [
     },
     handler: async ({ body, c }) => {
       const user = c.get("requireUser")();
+      requireOrThrow(await usersRepo.decrementCredits(user.id), outOfCredit);
       return await startChatSession({ userId: user.id, kind: "user", userMessageText: body.message });
     },
   }),
@@ -31,6 +34,8 @@ export const routes = [
     },
     handler: async ({ params, body, c }) => {
       const user = c.get("requireUser")();
+
+      requireOrThrow(await usersRepo.decrementCredits(user.id), outOfCredit);
 
       const session = requireOrThrow(await beginGenerating(params.id, user.id), chatBusy);
 

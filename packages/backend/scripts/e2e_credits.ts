@@ -42,6 +42,17 @@ async function seedUser(credits: number): Promise<string> {
     created_at: now,
     updated_at: now,
   });
+  // resolveSession joins the user's accounts row for the email. Without it
+  // the auth middleware returns null and routes 401 — seed a matching row.
+  await ddbTables.accounts.put({
+    user_id: id,
+    provider: "google",
+    sub: id,
+    email: `${id}@example.invalid`,
+    email_verified: true,
+    created_at: now,
+    updated_at: now,
+  });
   return id;
 }
 

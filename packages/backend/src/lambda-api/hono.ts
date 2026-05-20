@@ -1,16 +1,12 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { z } from "zod";
 
+import { registerGoogleOAuthRoutes } from "../auth/google-oauth-routes.js";
 import {
   clearSessionCookie,
   parseSessionCookie,
   resolveSession,
-  setSessionCookie,
-  signIn,
   signOut,
-  signUp,
-  UsernameTakenError,
 } from "../auth/index.js";
 import type { AppEnv } from "../lib/app-context.js";
 import { warning } from "../lib/developer-warning.js";
@@ -45,37 +41,7 @@ if (telemetry) {
 }
 
 // ── Auth endpoints ────────────────────────────────────────────────────
-const credentialsSchema = z.object({
-  username: z.string().trim().min(3).max(64),
-  password: z.string().min(5).max(256),
-});
-const signupSchema = credentialsSchema.extend({
-  name: z.string().trim().min(1).max(128),
-});
-
-app.post("/api/auth/sign-up", async (c) => {
-  const parsed = signupSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) throw new HTTPException(400, { message: "invalid_body" });
-  try {
-    const result = await signUp(parsed.data);
-    setSessionCookie(c, result.sessionId, result.expiresAt);
-    return c.json({ user: result.user });
-  } catch (err) {
-    if (err instanceof UsernameTakenError) {
-      throw new HTTPException(409, { message: "username_taken" });
-    }
-    throw err;
-  }
-});
-
-app.post("/api/auth/sign-in", async (c) => {
-  const parsed = credentialsSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) throw new HTTPException(400, { message: "invalid_body" });
-  const result = await signIn(parsed.data);
-  if (!result) throw new HTTPException(401, { message: "invalid_credentials" });
-  setSessionCookie(c, result.sessionId, result.expiresAt);
-  return c.json({ user: result.user });
-});
+registerGoogleOAuthRoutes(app);
 
 app.post("/api/auth/sign-out", async (c) => {
   const sessionId = parseSessionCookie(c.req.header("cookie"));

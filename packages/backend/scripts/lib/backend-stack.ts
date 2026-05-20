@@ -51,15 +51,25 @@ export class BackendStack extends cdk.Stack {
       pointInTimeRecovery: true,
     } as const;
 
-    // users: id → { username, password_hash, name, created_at }
+    // users: id → { name, credits, created_at }
     const usersTable = new dynamodb.Table(this, "UsersTable", {
       ...tableDefaults,
       tableName: `${id}-users`,
       partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
     });
-    usersTable.addGlobalSecondaryIndex({
-      indexName: "by-username",
-      partitionKey: { name: "username", type: dynamodb.AttributeType.STRING },
+
+    // accounts: (user_id, provider) → { sub, email, email_verified, ... }
+    // GSI by-provider-sub: lookup by (provider, sub) on Google sign-in.
+    const accountsTable = new dynamodb.Table(this, "AccountsTable", {
+      ...tableDefaults,
+      tableName: `${id}-accounts`,
+      partitionKey: { name: "user_id", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "provider", type: dynamodb.AttributeType.STRING },
+    });
+    accountsTable.addGlobalSecondaryIndex({
+      indexName: "by-provider-sub",
+      partitionKey: { name: "provider", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "sub", type: dynamodb.AttributeType.STRING },
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
@@ -114,6 +124,7 @@ export class BackendStack extends cdk.Stack {
 
     const allTables = [
       usersTable,
+      accountsTable,
       sessionsTable,
       profilesTable,
       memoriesTable,

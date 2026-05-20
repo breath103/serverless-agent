@@ -1,11 +1,10 @@
 #!/usr/bin/env -S node --import tsx
 /**
- * Seed a fake user_skills row for a given user — drives `userSkillsRepo.upsert`
+ * Seed a fake user_skills row for the dev-admin user — drives `userSkillsRepo.upsert`
  * with synthetic OAuth tokens so the frontend connected-state can be exercised
  * locally without a real Google round-trip.
  *
- * Usage:  ./packages/backend/scripts/seed_user_skill.ts <username> [skillId]
- *   - <username>:  e.g. `admin`
+ * Usage:  ./packages/backend/scripts/seed_user_skill.ts [skillId]
  *   - [skillId]:   default `google-calendar`
  *
  * Idempotent — `upsert` dedupes on (user_id, skill_id), so re-running just
@@ -18,18 +17,14 @@ loadEnv("development");
 import type { InstallableSkillId } from "../src/skills/index.js";
 import { userSkillsRepo } from "../src/skills/user-skills-repository.js";
 import { usersRepo } from "../src/users/users-repository.js";
+import { DEV_ADMIN_USER_ID } from "./lib/dev-auth.js";
 
 async function main(): Promise<void> {
-  const username = process.argv[2];
-  const skillId = (process.argv[3] ?? "google-calendar") as InstallableSkillId;
-  if (!username) {
-    console.error("usage: seed_user_skill.ts <username> [skillId]");
-    process.exit(1);
-  }
+  const skillId = (process.argv[2] ?? "google-calendar") as InstallableSkillId;
 
-  const user = await usersRepo.getByUsername(username);
+  const user = await usersRepo.getById(DEV_ADMIN_USER_ID);
   if (!user) {
-    console.error(`user not found: ${username}`);
+    console.error("dev-admin user not found — run `npm run -w backend ddb:bootstrap` first");
     process.exit(1);
   }
 
@@ -40,11 +35,11 @@ async function main(): Promise<void> {
       accessToken: "ya29.fake-access-token",
       refreshToken: "1//fake-refresh-token",
       expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-      email: `${username}@example.invalid`,
-      name: `${username} (seeded)`,
+      email: "admin@example.invalid",
+      name: "Admin (seeded)",
     },
   });
-  console.log(`seeded ${skillId} for ${username}: ${row.id}`);
+  console.log(`seeded ${skillId} for dev-admin: ${row.id}`);
 }
 
 main().catch((err) => {

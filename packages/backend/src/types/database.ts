@@ -13,9 +13,18 @@ import type { ProfileDebug } from "./profile.js";
 
 export type UserRow = {
   id: string;
-  username: string;
-  password_hash: string;
   name: string;
+  credits: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AccountRow = {
+  user_id: string;
+  provider: "google";
+  sub: string;
+  email: string;
+  email_verified: boolean;
   created_at: string;
   updated_at: string;
 };

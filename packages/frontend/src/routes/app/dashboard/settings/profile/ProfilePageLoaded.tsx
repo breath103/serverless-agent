@@ -62,7 +62,7 @@ export function ProfilePageLoaded({ profile }: { profile: ProfileRow }) {
         <div className="mx-auto flex max-w-3xl flex-col gap-8 p-8">
           <Section title="IDENTITY" hint="How you appear in the app.">
             <Field label="NAME"><Input {...register("name")} /></Field>
-            <Field label="USERNAME"><Input value={user.username} disabled className="text-text-3" /></Field>
+            <Field label="EMAIL"><Input value={user.email} disabled className="text-text-3" /></Field>
           </Section>
 
           <Section title="PREFERENCES" hint="Used for dates, times, and default response language.">

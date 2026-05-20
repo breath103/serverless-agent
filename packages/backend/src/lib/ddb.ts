@@ -10,6 +10,7 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 
 import type {
+  AccountRow,
   ChatSessionMessageRow,
   ChatSessionRow,
   MemoryRow,
@@ -196,6 +197,7 @@ export class DdbTable<TRow, TKey extends DdbKey> {
 
 export const ddbTables = {
   users: new DdbTable<UserRow, { id: string }>("users"),
+  accounts: new DdbTable<AccountRow, { user_id: string; provider: string }>("accounts"),
   sessions: new DdbTable<SessionRow, { id: string }>("sessions"),
   profiles: new DdbTable<ProfileRow, { user_id: string }>("profiles"),
   memories: new DdbTable<MemoryRow, { user_id: string; id: string }>("memories"),

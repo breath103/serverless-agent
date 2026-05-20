@@ -12,6 +12,8 @@ import { ChatInput } from "./ChatInput";
 import { useChatMessages } from "./hooks";
 import { MessageBlock } from "./MessageBlock";
 
+const OUT_OF_CREDIT_ERROR = "out_of_credit";
+
 type AssistantContent = Extract<ChatSessionMessageData, { role: "assistant" }>["content"];
 type ToolResult = Extract<AssistantContent, { kind: "tool_result" }>;
 
@@ -47,6 +49,7 @@ export function ChatConversation({ sessionId }: { sessionId: string }) {
   }, [messages.length, session?.is_generating]);
 
   const busy = send.status === "loading" || session?.is_generating === true;
+  const outOfCredit = send.status === "error" && send.error.message === OUT_OF_CREDIT_ERROR;
 
   // Reverse index: tool_call_id → tool_result. Lets each tool_call block
   // render its matching result without a second linear pass per row.
@@ -84,7 +87,8 @@ export function ChatConversation({ sessionId }: { sessionId: string }) {
           {session?.is_generating && <ThinkingIndicator />}
         </div>
       </div>
-      <ChatInput onSend={(text) => void send.call(text)} disabled={busy} />
+      {outOfCredit && <OutOfCreditBanner />}
+      <ChatInput onSend={(text) => void send.call(text)} disabled={busy || outOfCredit} />
     </div>
   );
 }
@@ -116,6 +120,16 @@ function Dot({ delay }: { delay: string }) {
   );
 }
 
+function OutOfCreditBanner() {
+  return (
+    <div className="mx-auto w-full max-w-3xl px-8 pb-2">
+      <div className="border border-red px-3 py-2 text-xs text-red">
+        ! You ran out of credit. New messages are paused.
+      </div>
+    </div>
+  );
+}
+
 /** Empty-state right pane: first send creates a new chat and navigates. */
 export function NewChatConversation() {
   const navigate = useNavigate();
@@ -124,6 +138,8 @@ export function NewChatConversation() {
     const { sessionId } = await api.fetch("/api/chat", "POST", { body: { message: text } });
     await navigate({ to: "/dashboard/chats/$chatId", params: { chatId: sessionId } });
   }, []);
+
+  const outOfCredit = create.status === "error" && create.error.message === OUT_OF_CREDIT_ERROR;
 
   return (
     <div className="flex h-full flex-col">
@@ -135,7 +151,8 @@ export function NewChatConversation() {
         <p className="hud-label">AWAITING INPUT</p>
         <p className="hud-caption">TYPE BELOW TO INITIALIZE A NEW CHAT.</p>
       </div>
-      <ChatInput onSend={(text) => void create.call(text)} disabled={create.status === "loading"} />
+      {outOfCredit && <OutOfCreditBanner />}
+      <ChatInput onSend={(text) => void create.call(text)} disabled={create.status === "loading" || outOfCredit} />
     </div>
   );
 }

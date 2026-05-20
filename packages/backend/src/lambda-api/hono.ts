@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 
@@ -6,8 +8,11 @@ import {
   clearSessionCookie,
   parseSessionCookie,
   resolveSession,
+  SESSION_TTL_MS,
+  setSessionCookie,
   signOut,
 } from "../auth/index.js";
+import { sessionsRepo } from "../auth/sessions-repository.js";
 import type { AppEnv } from "../lib/app-context.js";
 import { warning } from "../lib/developer-warning.js";
 import { registerToHono } from "../lib/hono-adapter.js";
@@ -42,6 +47,18 @@ if (telemetry) {
 
 // ── Auth endpoints ────────────────────────────────────────────────────
 registerGoogleOAuthRoutes(app);
+
+// Dev-only: sign in as the seeded dev-admin user without going through Google.
+// Used by ./scripts/e2e.ts login for headless browser automation.
+if (process.env.NODE_ENV === "development") {
+  app.post("/api/auth/dev-login", async (c) => {
+    const sessionId = randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+    await sessionsRepo.create({ id: sessionId, userId: "dev-admin", expiresAt });
+    setSessionCookie(c, sessionId, expiresAt);
+    return c.json({ ok: true });
+  });
+}
 
 app.post("/api/auth/sign-out", async (c) => {
   const sessionId = parseSessionCookie(c.req.header("cookie"));

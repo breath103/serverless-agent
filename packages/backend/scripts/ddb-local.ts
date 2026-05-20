@@ -273,7 +273,7 @@ async function cmdSeedAdmin() {
   await ddbTables.users.put({
     id: DEV_ADMIN_USER_ID,
     name: "Admin",
-    credits: 100,
+    credits: 10,
     created_at: now,
     updated_at: now,
   });

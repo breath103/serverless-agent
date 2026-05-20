@@ -58,6 +58,6 @@ export default harness(async ({ step, stepOrExit, log, page, request }) => {
     ], { stdio: "inherit" });
     step(`ffmpeg stitched ${VIDEO_PATH}`, ffmpeg.status === 0);
   } finally {
-    await request.post("/api/dev/set-credits", { data: { credits: 100 } });
+    await request.post("/api/dev/set-credits", { data: { credits: 10 } });
   }
 });

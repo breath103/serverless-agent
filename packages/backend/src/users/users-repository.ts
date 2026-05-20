@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { type DdbTable, ddbTables } from "../lib/ddb.js";
 import type { UserRow } from "../types/database.js";
 
-const STARTING_CREDITS = 100;
+const STARTING_CREDITS = 10;
 
 class UsersRepository {
   constructor(private readonly table: DdbTable<UserRow, { id: string }>) {}

@@ -41,8 +41,10 @@ Rule: **don't push until both jobs are green locally**. If it passes locally and
 
 - All persistent state lives in **DynamoDB**. The CDK stack (`packages/backend/scripts/lib/backend-stack.ts`) declares every table. Attribute names mirror the TS row shapes in `packages/backend/src/types/database.ts` — snake_case keys, ISO-string timestamps.
 - Access goes through the DocumentClient singleton in `packages/backend/src/lib/ddb.ts` + typed repos under `packages/backend/src/<domain>/*-repository.ts`.
-- Auth is username + password with scrypt hashing (`packages/backend/src/auth/`) and a TTL-scoped `sessions` table. Session cookie is `sa_session`, HTTP-only, set by `/api/auth/sign-in` and `/api/auth/sign-up`.
+- Auth is **Google OAuth only** (`packages/backend/src/auth/`, `packages/backend/src/lib/google-oauth.ts`). User identity in the `users` table is a uuid; provider identity (Google `sub`, email) lives in the separate `accounts` table. TTL-scoped `sessions` table is unchanged. Session cookie is `sa_session`, HTTP-only, set by `/api/auth/google/callback`.
+- Every user starts with **100 credits** (`users.credits`). One credit is deducted per user-authored chat message. At 0, sends are rejected with "You ran out of credit".
 
 ## Demo constraints
 
-- No third-party OAuth integrations, no billable-usage tracking, no radar feature. The agent has two skills: `memory` and `web-search` (Tavily).
+- Google OAuth is the only sign-in path. No username/password, no email magic links, no other providers. The agent has two skills: `memory` and `web-search` (Tavily).
+- No radar feature.

@@ -4,7 +4,9 @@ declare namespace NodeJS {
     TAVILY_API_KEY: string;
 
     // Google OAuth (Cloud Console → APIs & Services → Credentials → OAuth client of type Web).
-    // Authorized redirect URI in dev: http://localhost:<edge.devPort>/api/skills/oauth/callback
+    // Authorized redirect URIs in dev:
+    //   - http://localhost:<edge.devPort>/api/auth/google/callback   (user sign-in)
+    //   - http://localhost:<edge.devPort>/api/skills/oauth/callback  (google-calendar skill)
     GOOGLE_CLIENT_ID: string;
     GOOGLE_CLIENT_SECRET: string;
 

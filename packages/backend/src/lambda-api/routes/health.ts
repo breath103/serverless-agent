@@ -7,7 +7,7 @@ export const routes = [
       return {
         status: "ok" as const,
         timestamp: Date.now(),
-        user: user ? { id: user.id, name: user.name, username: user.username } : null,
+        user: user ? { id: user.id, name: user.name, email: user.email } : null,
         region: process.env.AWS_REGION,
       };
     },

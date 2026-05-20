@@ -14,9 +14,11 @@ import {
   waitUntilTableExists,
 } from "@aws-sdk/client-dynamodb";
 
-import { signUp } from "../src/auth/index.js";
-import { usersRepo } from "../src/users/users-repository.js";
+import { accountsRepo } from "../src/accounts/accounts-repository.js";
+import { ddbTables } from "../src/lib/ddb.js";
+import { profilesRepo } from "../src/profiles/profiles-repository.js";
 import { localContainerName, localDdbEndpoint, localDdbPort } from "./lib/ddb_local.js";
+import { DEV_ADMIN_USER_ID } from "./lib/dev-auth.js";
 import { loadEnv } from "./lib/env.js";
 
 // Load .env.development so the repos pick up TABLE_NAME_PREFIX etc.
@@ -51,15 +53,31 @@ const tables: TableSpec[] = [
     input: {
       TableName: `${TABLE_PREFIX}-users`,
       BillingMode: "PAY_PER_REQUEST",
-      AttributeDefinitions: [
-        { AttributeName: "id", AttributeType: "S" },
-        { AttributeName: "username", AttributeType: "S" },
-      ],
+      AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
       KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+    },
+  },
+  {
+    name: `${TABLE_PREFIX}-accounts`,
+    input: {
+      TableName: `${TABLE_PREFIX}-accounts`,
+      BillingMode: "PAY_PER_REQUEST",
+      AttributeDefinitions: [
+        { AttributeName: "user_id", AttributeType: "S" },
+        { AttributeName: "provider", AttributeType: "S" },
+        { AttributeName: "sub", AttributeType: "S" },
+      ],
+      KeySchema: [
+        { AttributeName: "user_id", KeyType: "HASH" },
+        { AttributeName: "provider", KeyType: "RANGE" },
+      ],
       GlobalSecondaryIndexes: [
         {
-          IndexName: "by-username",
-          KeySchema: [{ AttributeName: "username", KeyType: "HASH" }],
+          IndexName: "by-provider-sub",
+          KeySchema: [
+            { AttributeName: "provider", KeyType: "HASH" },
+            { AttributeName: "sub", KeyType: "RANGE" },
+          ],
           Projection: { ProjectionType: "ALL" },
         },
       ],
@@ -246,13 +264,28 @@ async function cmdDeleteTables() {
 }
 
 async function cmdSeedAdmin() {
-  const existing = await usersRepo.getByUsername("admin");
+  const existing = await ddbTables.users.get({ id: DEV_ADMIN_USER_ID });
   if (existing) {
     console.log("admin user already exists");
     return;
   }
-  await signUp({ username: "admin", password: "admin", name: "Admin" });
-  console.log("seeded admin / admin");
+  const now = new Date().toISOString();
+  await ddbTables.users.put({
+    id: DEV_ADMIN_USER_ID,
+    name: "Admin",
+    credits: 100,
+    created_at: now,
+    updated_at: now,
+  });
+  await profilesRepo.create(DEV_ADMIN_USER_ID, { name: "Admin" });
+  await accountsRepo.create({
+    userId: DEV_ADMIN_USER_ID,
+    provider: "google",
+    sub: "dev-admin",
+    email: "admin@example.invalid",
+    emailVerified: true,
+  });
+  console.log(`seeded dev-admin user (id=${DEV_ADMIN_USER_ID})`);
 }
 
 async function main() {

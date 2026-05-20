@@ -25,6 +25,7 @@ import { createTelegramDispatcher } from "../src/channels/telegram-dispatcher.js
 import { ddbTables } from "../src/lib/ddb.js";
 import { taggedConfig } from "../src/skills/index.js";
 import { TELEGRAM_SECRET_HEADER, telegramDeleteWebhook, telegramGetMe, telegramSendMessage, telegramSetWebhook } from "../src/skills/telegram.js";
+import { DEV_ADMIN_USER_ID, devSignIn } from "./lib/dev-auth.js";
 import { loadEnv } from "./lib/env.js";
 
 loadEnv("development");
@@ -35,19 +36,6 @@ const BASE = `http://localhost:${config.edge.devPort}`;
 // eslint-disable-next-line @typescript-eslint/no-restricted-types -- assertion helper accepts any truthy/falsy
 function assert(cond: unknown, msg: string): asserts cond {
   if (!cond) throw new Error(`ASSERT: ${msg}`);
-}
-
-async function login(username: string, password: string): Promise<string> {
-  const res = await fetch(`${BASE}/api/auth/sign-in`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
-  if (!res.ok) throw new Error(`sign-in failed: ${res.status} ${await res.text()}`);
-  const setCookie = res.headers.get("set-cookie") ?? "";
-  const match = /sa_session=([^;]+)/.exec(setCookie);
-  assert(match, "no sa_session cookie returned from sign-in");
-  return `sa_session=${match[1]}`;
 }
 
 async function waitFor(check: () => Promise<boolean>, timeoutMs = 5000): Promise<void> {
@@ -142,7 +130,7 @@ async function main(): Promise<void> {
     assert(sentText.includes("• bullet one"), `sendMessage didn't convert bullets: ${sentText}`);
 
     console.log("→ sign in as admin");
-    const cookie = await login("admin", "admin");
+    const cookie = await devSignIn(DEV_ADMIN_USER_ID);
     const me2 = await fetch(`${BASE}/api/auth/session`, { headers: { Cookie: cookie } });
     const session = await me2.json() as { user: { id: string } };
     const userId = session.user.id;

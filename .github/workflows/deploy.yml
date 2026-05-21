@@ -56,7 +56,7 @@ jobs:
         id: aws
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::031134018515:role/serverless-agent-github-actions
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
 
       - name: Write backend .env.production

@@ -6,9 +6,15 @@ Example repo for the **AWS Summit Korea — DEV308** session *맥 미니 없이�
 
 A cloud agent implementation that runs on AWS serverless components only (Lambda, DynamoDB, S3, IoT Core, CloudFront). Includes a chat UI, an LLM loop with tool calling, persistent memory, and realtime browser updates. The AWS infrastructure is effectively unbilled while idle (LLM API costs are separate).
 
+You can try out the working demo here: **[serverless-agent.com](https://www.serverless-agent.com/)** — first 10 chats are free.
+
 ![Web UI and Telegram mirror](./documents/images/agent-web-and-telegram.png)
 
 *Same chat session shown in the web UI (left) and mirrored to a Telegram bot (right). Tool-call progress streams live to both surfaces.*
+
+![Skills settings — Google Calendar and Telegram connected](./documents/images/agent-demo-2.png)
+
+*Settings → Skills. Each skill is a one-click connect: Google Calendar via OAuth, Telegram via a BotFather token. Tokens land in the `user-skills` DDB row, never in env.*
 
 ---
 

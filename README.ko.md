@@ -6,9 +6,15 @@
 
 AWS의 serverless 컴포넌트(Lambda, DynamoDB, S3, IoT Core, CloudFront)만으로 동작하는 cloud agent 구현입니다. 채팅 UI, LLM loop + tool calling 런타임, 영구 메모리, 실시간 브라우저 업데이트가 포함되어 있습니다. AWS 인프라는 idle 상태에서는 사실상 청구되지 않습니다 (LLM API 비용은 별도).
 
+동작하는 데모는 여기에서 바로 써볼 수 있습니다: **[serverless-agent.com](https://www.serverless-agent.com/)** — 첫 10회 채팅은 무료입니다.
+
 ![웹 UI와 Telegram 미러](./documents/images/agent-web-and-telegram.png)
 
 *동일한 채팅 세션이 웹 UI(왼쪽)와 Telegram 봇(오른쪽)에 동시에 표시되는 모습. tool-call 진행 상황이 양쪽으로 실시간 스트리밍됩니다.*
+
+![Skills 설정 — Google Calendar와 Telegram 연결됨](./documents/images/agent-demo-2.png)
+
+*Settings → Skills. 각 스킬은 클릭 한 번으로 연결됩니다: Google Calendar는 OAuth로, Telegram은 BotFather 토큰으로. 토큰은 `user-skills` DDB row에만 저장되며 env에는 들어가지 않습니다.*
 
 ---
 

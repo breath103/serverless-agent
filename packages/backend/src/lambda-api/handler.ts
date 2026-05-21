@@ -28,14 +28,15 @@ export const handler: StreamHandler = Object.assign(
       return;
     }
 
-    await _handler(...args);
-
-    // This runs after the lambda response stream is closed.
-    // shutdown() waits for pending capture() promises before flushing.
-    await Promise.all([
-      posthog?.shutdown(),
-      telemetry?.flush(),
-    ]);
+    try {
+      await _handler(...args);
+    } finally {
+      // shutdown() waits for pending capture() promises before flushing.
+      await Promise.all([
+        posthog?.shutdown(),
+        telemetry?.flush(),
+      ]);
+    }
   },
   _handler,
 ) as StreamHandler;

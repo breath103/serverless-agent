@@ -4,6 +4,7 @@ import { deleteCookie, setCookie } from "hono/cookie";
 
 import { accountsRepo } from "../accounts/accounts-repository.js";
 import type { AppContext } from "../lib/app-context.js";
+import { warning } from "../lib/developer-warning.js";
 import { profilesRepo } from "../profiles/profiles-repository.js";
 import type { UserRow } from "../types/database.js";
 import { usersRepo } from "../users/users-repository.js";
@@ -60,6 +61,7 @@ export async function signInWithGoogle(input: {
       email: input.email,
       emailVerified: input.emailVerified,
     });
+    warning.send("user_signup", () => ({ userId: user.id, email: input.email, name: input.name }));
   }
 
   const sessionId = newSessionId();

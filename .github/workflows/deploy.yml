@@ -6,9 +6,11 @@ on:
       - main
       - "**"
 
+# Feature-branch pushes cancel in-progress runs (most recent push wins).
+# Main pushes never cancel — deploys finishing mid-flight is worse than waiting.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   check:
@@ -31,3 +33,51 @@ jobs:
           node-version-file: ".nvmrc"
       - run: npm ci
       - run: ${{ matrix.command }}
+
+  deploy:
+    needs: check
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: self-hosted
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Configure AWS credentials
+        id: aws
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Write backend .env.production
+        run: |
+          cat > packages/backend/.env.production <<'EOF'
+          TAVILY_API_KEY="${{ secrets.TAVILY_API_KEY }}"
+          GOOGLE_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}"
+          GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}"
+          AGENT_MQTT_NAMESPACE="${{ secrets.AGENT_MQTT_NAMESPACE }}"
+          EOF
+
+      - name: Write frontend .env.production
+        run: |
+          cat > packages/frontend/.env.production <<'EOF'
+          AGENT_STORAGE_URL="${{ secrets.AGENT_STORAGE_URL }}"
+          EOF
+
+      - name: Deploy backend
+        env:
+          CDK_DEFAULT_ACCOUNT: ${{ steps.aws.outputs.aws-account-id }}
+        run: ./packages/backend/scripts/deploy.ts --env=production
+
+      - name: Deploy frontend
+        run: ./packages/frontend/scripts/deploy.ts --env=production

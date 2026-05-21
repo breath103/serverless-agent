@@ -66,12 +66,16 @@ jobs:
           GOOGLE_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}"
           GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}"
           AGENT_MQTT_NAMESPACE="${{ secrets.AGENT_MQTT_NAMESPACE }}"
+          POSTHOG_KEY="${{ secrets.POSTHOG_KEY }}"
+          POSTHOG_HOST="${{ secrets.POSTHOG_HOST }}"
           EOF
 
       - name: Write frontend .env.production
         run: |
           cat > packages/frontend/.env.production <<'EOF'
           AGENT_STORAGE_URL="${{ secrets.AGENT_STORAGE_URL }}"
+          POSTHOG_KEY="${{ secrets.POSTHOG_KEY }}"
+          POSTHOG_HOST="${{ secrets.POSTHOG_HOST }}"
           EOF
 
       - name: Deploy backend

@@ -5,6 +5,7 @@ import { beginGenerating } from "../../agent-runtime/lifecycle.js";
 import { continueChatSession, startChatSession } from "../../agent-runtime/start-chat-session.js";
 import { chatSessionsRepo } from "../../chat-sessions/chat-sessions-repository.js";
 import { route } from "../../lib/app-context.js";
+import { warning } from "../../lib/developer-warning.js";
 import { publishRealtimeEvent } from "../../lib/realtime-publish.js";
 import { requireOrThrow } from "../../lib/require-or-throw.js";
 import { usersRepo } from "../../users/users-repository.js";
@@ -23,7 +24,9 @@ export const routes = [
     handler: async ({ body, c }) => {
       const user = c.get("requireUser")();
       requireOrThrow(await usersRepo.decrementCredits(user.id), outOfCredit);
-      return await startChatSession({ userId: user.id, kind: "user", userMessageText: body.message });
+      const session = await startChatSession({ userId: user.id, kind: "user", userMessageText: body.message });
+      warning.send("chat_start", () => ({ userId: user.id, sessionId: session.sessionId }));
+      return session;
     },
   }),
 

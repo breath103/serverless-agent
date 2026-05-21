@@ -4,6 +4,7 @@ import { createRouter, RouterProvider } from "@tanstack/react-router";
 
 import { ModalProvider } from "@/components/ui/modal";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { PosthogProvider } from "@/contexts/PosthogContext";
 import { RepositoryProvider } from "@/contexts/RepositoryContext";
 
 import { routeTree } from "./routeTree.gen";
@@ -22,10 +23,12 @@ declare module "@tanstack/react-router" {
 // This only affects development double-rendering; zero production impact.
 createRoot(document.getElementById("root")!).render(
   <AuthProvider>
-    <RepositoryProvider>
-      <ModalProvider>
-        <RouterProvider router={router} />
-      </ModalProvider>
-    </RepositoryProvider>
+    <PosthogProvider>
+      <RepositoryProvider>
+        <ModalProvider>
+          <RouterProvider router={router} />
+        </ModalProvider>
+      </RepositoryProvider>
+    </PosthogProvider>
   </AuthProvider>,
 );

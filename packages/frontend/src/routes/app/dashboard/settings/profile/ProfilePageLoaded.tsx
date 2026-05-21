@@ -65,6 +65,12 @@ export function ProfilePageLoaded({ profile }: { profile: ProfileRow }) {
             <Field label="EMAIL"><Input value={user.email} disabled className="text-text-3" /></Field>
           </Section>
 
+          <Section title="CREDITS" hint="Each chat message you send costs 1 credit.">
+            <Field label="REMAINING">
+              <Input value={String(user.credits)} disabled className="text-text-3 tabular-nums" />
+            </Field>
+          </Section>
+
           <Section title="PREFERENCES" hint="Used for dates, times, and default response language.">
             <Field label="LANGUAGE"><Select options={LANGUAGES} {...register("language")} /></Field>
             <Field label="TIMEZONE"><Select options={TIMEZONES} {...register("timezone")} /></Field>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 
 import { useNavigate } from "@tanstack/react-router";
 
+import { useRefreshAuth } from "@/contexts/AuthContext";
 import type { ChatSessionMessageData } from "@/contexts/RealtimeContext";
 import { useMutation } from "@/hooks/useMutation";
 import { api } from "@/lib/api";
@@ -25,12 +26,17 @@ export function ChatConversation({ sessionId }: { sessionId: string }) {
   // If they've scrolled up to read, don't yank them back down.
   const stickToBottomRef = useRef(true);
 
+  const refreshAuth = useRefreshAuth();
   const send = useMutation(async (text: string) => {
-    await api.fetch("/api/chat/:id/message", "POST", {
-      params: { id: sessionId },
-      body: { message: text },
-    });
-  }, [sessionId]);
+    try {
+      await api.fetch("/api/chat/:id/message", "POST", {
+        params: { id: sessionId },
+        body: { message: text },
+      });
+    } finally {
+      void refreshAuth();
+    }
+  }, [sessionId, refreshAuth]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -134,10 +140,15 @@ function OutOfCreditBanner() {
 export function NewChatConversation() {
   const navigate = useNavigate();
 
+  const refreshAuth = useRefreshAuth();
   const create = useMutation(async (text: string) => {
-    const { sessionId } = await api.fetch("/api/chat", "POST", { body: { message: text } });
-    await navigate({ to: "/dashboard/chats/$chatId", params: { chatId: sessionId } });
-  }, []);
+    try {
+      const { sessionId } = await api.fetch("/api/chat", "POST", { body: { message: text } });
+      await navigate({ to: "/dashboard/chats/$chatId", params: { chatId: sessionId } });
+    } finally {
+      void refreshAuth();
+    }
+  }, [navigate, refreshAuth]);
 
   const outOfCredit = create.status === "error" && create.error.message === OUT_OF_CREDIT_ERROR;
 

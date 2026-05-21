@@ -21,7 +21,7 @@ export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
  * `email` is joined from the user's `accounts` row at resolve time so
  * downstream code doesn't have to load the accounts table separately.
  */
-export type AuthUser = Pick<UserRow, "id" | "name"> & { email: string };
+export type AuthUser = Pick<UserRow, "id" | "name" | "credits"> & { email: string };
 
 function sessionExpiry(): Date {
   return new Date(Date.now() + SESSION_TTL_MS);
@@ -69,7 +69,7 @@ export async function signInWithGoogle(input: {
   await sessionsRepo.create({ id: sessionId, userId: user.id, expiresAt });
 
   return {
-    user: { id: user.id, name: user.name, email: input.email },
+    user: { id: user.id, name: user.name, credits: user.credits, email: input.email },
     sessionId,
     expiresAt,
   };
@@ -91,7 +91,7 @@ export async function resolveSession(sessionId: string): Promise<AuthUser | null
   const accounts = await accountsRepo.listForUser(user.id);
   const primaryEmail = accounts[0]?.email;
   if (!primaryEmail) return null;
-  return { id: user.id, name: user.name, email: primaryEmail };
+  return { id: user.id, name: user.name, credits: user.credits, email: primaryEmail };
 }
 
 export function parseSessionCookie(cookieHeader: string | undefined | null): string | null {
